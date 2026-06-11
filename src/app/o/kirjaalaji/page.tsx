@@ -1,15 +1,15 @@
 import PageHeader from "@/components/PageHeader";
 import LokiFlow from "@/components/LokiFlow";
 import { listPlayers } from "@/lib/db/players";
-import { listeventt } from "@/lib/db/events";
+import { listevents } from "@/lib/db/events";
 
 export default async function LokiPage() {
-  const [players, eventt] = await Promise.all([listPlayers(), listeventt()]);
-  const nextNumber = eventt.length + 1;
+  const [players, events] = await Promise.all([listPlayers(), listevents()]);
+  const nextNumber = events.length + 1;
 
   return (
     <>
-      <PageHeader title="Loki" subtitle="Uusi event ja pisteet" />
+      <PageHeader title="Kirjaa uusi laji" />
       <LokiFlow players={players} nextNumber={nextNumber} />
     </>
   );

@@ -1,22 +1,22 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { listeventt } from "@/lib/db/events";
+import { listevents } from "@/lib/db/events";
 
-export default async function HistoriaPage() {
-  const eventt = await listeventt();
+export default async function historyPage() {
+  const events = await listevents();
 
   return (
     <>
-      <PageHeader title="Historia" subtitle={`${eventt.length} eventa`} />
+      <PageHeader title="Historia" subtitle={`${events.length} lajit`} />
 
-      {eventt.length === 0 ? (
+      {events.length === 0 ? (
         <div className="card text-center text-teal-600">
           Ei vielä lajeja. Luo ensimmäinen Loki-välilehdeltä.
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {eventt.map((event) => (
+          {events.map((event) => (
             <Link
               key={event.id}
               href={`/o/historia/${event.id}`}

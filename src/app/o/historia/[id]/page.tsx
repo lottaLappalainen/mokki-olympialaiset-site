@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { geteventDetail } from "@/lib/db/reads";
+import { getEventDetail } from "@/lib/db/reads";
 import EventDetailView from "@/components/EventDetailView";
 
 export default async function EventDetailPage({
