@@ -4,9 +4,9 @@ import { requireSpace } from "@/lib/auth/require";
 import { signPaths } from "@/lib/storage/images";
 import type {
   LeaderboardRow,
-  LajiResultRow,
-  Laji,
-  LajiPhoto,
+  eventResultRow,
+  event,
+  eventPhoto,
 } from "./types";
 
 // ── leaderboard: name, photo, total points (highest first) ────────────────
@@ -44,40 +44,40 @@ export async function getSpaceInfo(): Promise<{
   return data ?? null;
 }
 
-// ── one laji: header info + photos + ranked results ───────────────────────
-export interface LajiDetail extends Laji {
-  results: LajiResultRow[];
+// ── one event: header info + photos + ranked results ───────────────────────
+export interface eventDetail extends event {
+  results: eventResultRow[];
 }
 
-export async function getLajiDetail(id: string): Promise<LajiDetail | null> {
+export async function geteventDetail(id: string): Promise<eventDetail | null> {
   const { supabase } = await requireSpace();
 
-  const { data: laji } = await supabase
-    .from("lajit")
+  const { data: event } = await supabase
+    .from("eventt")
     .select("id, ordinal, name")
     .eq("id", id)
     .maybeSingle();
-  if (!laji) return null;
+  if (!event) return null;
 
   const { data: photoRows } = await supabase
-    .from("laji_photos")
+    .from("event_photos")
     .select("id, storage_path, sort_order")
-    .eq("laji_id", id)
+    .eq("event_id", id)
     .order("sort_order");
 
-  const { data: resultRows } = await supabase.rpc("get_laji_results", {
-    p_laji_id: id,
+  const { data: resultRows } = await supabase.rpc("get_event_results", {
+    p_event_id: id,
   });
-  const results = (resultRows ?? []) as Omit<LajiResultRow, "photo_url">[];
+  const results = (resultRows ?? []) as Omit<eventResultRow, "photo_url">[];
 
-  // Sign laji photos AND player photos together in one call.
+  // Sign event photos AND player photos together in one call.
   const paths = [
     ...(photoRows ?? []).map((p) => p.storage_path),
     ...results.map((r) => r.photo_path),
   ];
   const urls = await signPaths(supabase, paths);
 
-  const photos: LajiPhoto[] = (photoRows ?? []).map((p) => ({
+  const photos: eventPhoto[] = (photoRows ?? []).map((p) => ({
     id: p.id,
     storage_path: p.storage_path,
     sort_order: p.sort_order,
@@ -85,9 +85,9 @@ export async function getLajiDetail(id: string): Promise<LajiDetail | null> {
   }));
 
   return {
-    id: laji.id,
-    ordinal: laji.ordinal,
-    name: laji.name,
+    id: event.id,
+    ordinal: event.ordinal,
+    name: event.name,
     photos,
     results: results.map((r) => ({
       ...r,
@@ -96,9 +96,9 @@ export async function getLajiDetail(id: string): Promise<LajiDetail | null> {
   };
 }
 
-// ── one player: profile + their points per laji ───────────────────────────
+// ── one player: profile + their points per event ───────────────────────────
 export interface PlayerScore {
-  laji_id: string;
+  event_id: string;
   ordinal: number;
   name: string;
   points: number;
@@ -127,17 +127,17 @@ export async function getPlayerDetail(
 
   const { data: scoreRows } = await supabase
     .from("scores")
-    .select("points, lajit(id, ordinal, name)")
+    .select("points, eventt(id, ordinal, name)")
     .eq("player_id", id);
 
   const scores: PlayerScore[] = (scoreRows ?? [])
     .map((row: any) => ({
-      laji_id: row.lajit?.id,
-      ordinal: row.lajit?.ordinal ?? 0,
-      name: row.lajit?.name ?? "",
+      event_id: row.eventt?.id,
+      ordinal: row.eventt?.ordinal ?? 0,
+      name: row.eventt?.name ?? "",
       points: row.points,
     }))
-    .filter((s) => s.laji_id)
+    .filter((s) => s.event_id)
     .sort((a, b) => a.ordinal - b.ordinal);
 
   const total = scores.reduce((sum, s) => sum + s.points, 0);

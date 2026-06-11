@@ -8,18 +8,18 @@ export interface Player {
   photo_url: string | null;
 }
 
-export interface LajiPhoto {
+export interface eventPhoto {
   id: string;
   storage_path: string;
   sort_order: number;
   url: string | null;
 }
 
-export interface Laji {
+export interface event {
   id: string;
   ordinal: number;
   name: string;
-  photos: LajiPhoto[];
+  photos: eventPhoto[];
 }
 
 export interface LeaderboardRow {
@@ -30,7 +30,7 @@ export interface LeaderboardRow {
   total_points: number;
 }
 
-export interface LajiResultRow {
+export interface eventResultRow {
   player_id: string;
   name: string;
   photo_path: string | null;

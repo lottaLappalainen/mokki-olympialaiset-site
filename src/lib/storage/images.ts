@@ -15,7 +15,7 @@ function extOf(filename: string): string {
 export async function uploadImage(
   supabase: SupabaseClient,
   spaceId: string,
-  folder: "players" | "lajit",
+  folder: "players" | "eventt",
   file: File,
 ): Promise<string> {
   const path = `${spaceId}/${folder}/${randomUUID()}.${extOf(file.name)}`;

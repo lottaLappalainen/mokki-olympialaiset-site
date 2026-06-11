@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* ─── Brand ramp: mint → teal ─── */
+  --color-mint-50: #e5f9e0;
+  --color-mint-100: #a3f7b5;
+  --color-teal-400: #40c9a2;
+  --color-teal-600: #2f9c95;
+
+  /* ─── Warm accents (contrast to the greens) ─── */
+  --color-wine: #664147;
+  --color-plum: #703d57;
+
+  /* ─── Neutrals (tinted, not pure) ─── */
+  --color-paper: #fafdf8;
+  --color-ink: #10211e;
+
+  /* ─── Semantic aliases ─── */
+  --color-background: #fafdf8;
+  --color-foreground: #10211e;
+  --color-primary: #2f9c95;
+  --color-primary-hover: #40c9a2;
+  --color-surface: #e5f9e0;
+  --color-surface-2: #a3f7b5;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2
+           rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition-colors select-none disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply bg-primary text-paper hover:bg-primary-hover active:bg-primary-hover;
+  }
+  .btn-secondary {
+    @apply bg-surface-2 text-ink hover:bg-teal-400;
+  }
+  .btn-soft {
+    @apply bg-surface text-primary hover:bg-surface-2;
+  }
+  .btn-outline {
+    @apply bg-paper text-primary border-2 border-primary hover:bg-surface;
+  }
+  .btn-accent {
+    @apply bg-wine text-paper hover:bg-plum active:bg-plum;
+  }
+
+  .card {
+    @apply bg-paper rounded-2xl border border-mint-100 p-5;
+  }
+  .card-accent {
+    @apply bg-paper rounded-2xl p-5
+           border-t-4 border-t-wine border-x border-b border-mint-100;
+  }
+
+  .input {
+    @apply min-h-11 w-full rounded-xl border border-mint-100 bg-paper
+           px-3.5 text-ink placeholder:text-teal-600
+           focus:border-primary focus:outline-2 focus:outline-primary;
+  }
 }

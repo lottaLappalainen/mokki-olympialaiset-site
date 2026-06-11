@@ -1,65 +1,144 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useTransition } from "react";
+import { createSpace, joinSpace } from "@/lib/auth/actions";
+
+type View = "choose" | "created" | "enter";
+
+export default function LandingPage() {
+  const [view, setView] = useState<View>("choose");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function handleCreate() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const { code: newCode } = await createSpace();
+        setCode(newCode);
+        setView("created");
+      } catch {
+        setError("Olympialaisten luonti epäonnistui. Yritä uudelleen.");
+      }
+    });
+  }
+
+  function handleJoin() {
+    setError(null);
+    startTransition(async () => {
+      // On success joinSpace redirects to /o; only failures return here.
+      const result = await joinSpace(code);
+      if (result?.error) setError(result.error);
+    });
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable — the code is on screen to copy by hand.
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+      <div className="w-full max-w-sm">
+        <h1 className="text-3xl font-bold text-center text-ink mb-1">
+          Olympialaiset
+        </h1>
+        <p className="text-center text-teal-600 mb-8">
+          Luo tai liity koodilla
+        </p>
+
+        {view === "choose" && (
+          <div className="flex flex-col gap-3">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setError(null);
+                setCode("");
+                setView("enter");
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Syötä koodi
+            </button>
+            <button
+              className="btn btn-accent"
+              onClick={handleCreate}
+              disabled={isPending}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              {isPending ? "Luodaan…" : "Luo olympialaiset"}
+            </button>
+          </div>
+        )}
+
+        {view === "created" && (
+          <div className="flex flex-col gap-5">
+            <div className="card-accent text-center">
+              <p className="text-sm font-semibold text-wine mb-3">Jaa koodi</p>
+              <button
+                onClick={handleCopy}
+                aria-label="Kopioi koodi"
+                className="block w-full font-mono font-bold tracking-[0.15em] text-ink text-5xl leading-none break-all"
+              >
+                {code}
+              </button>
+              <p className="text-sm text-teal-600 mt-3 min-h-5">
+                {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
+              </p>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={handleJoin}
+              disabled={isPending}
+            >
+              {isPending ? "Avataan…" : "Jatka olympialaisiin"}
+            </button>
+          </div>
+        )}
+
+        {view === "enter" && (
+          <div className="flex flex-col gap-3">
+            <input
+              className="input text-center text-xl tracking-[0.15em] uppercase"
+              placeholder="Koodi"
+              value={code}
+              autoFocus
+              autoCapitalize="characters"
+              autoComplete="off"
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleJoin();
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleJoin}
+              disabled={isPending}
+            >
+              {isPending ? "Avataan…" : "Jatka"}
+            </button>
+            <button
+              className="btn btn-soft"
+              onClick={() => {
+                setError(null);
+                setView("choose");
+              }}
+            >
+              Takaisin
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-center text-wine font-medium mt-4">{error}</p>
+        )}
+      </div>
+    </main>
   );
 }

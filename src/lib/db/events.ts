@@ -3,40 +3,40 @@
 import { revalidatePath } from "next/cache";
 import { requireSpace } from "@/lib/auth/require";
 import { uploadImage, deleteImages, signPaths } from "@/lib/storage/images";
-import type { Laji, LajiPhoto } from "./types";
+import type { event, eventPhoto } from "./types";
 
-export async function listLajit(): Promise<Laji[]> {
+export async function listeventt(): Promise<event[]> {
   const { supabase } = await requireSpace();
 
-  const { data: lajit, error } = await supabase
-    .from("lajit")
+  const { data: eventt, error } = await supabase
+    .from("eventt")
     .select("id, ordinal, name")
     .order("ordinal")
     .order("name");
   if (error) throw new Error(error.message);
 
-  const list = lajit ?? [];
+  const list = eventt ?? [];
   const ids = list.map((l) => l.id);
 
-  const byLaji = new Map<string, LajiPhoto[]>();
+  const byevent = new Map<string, eventPhoto[]>();
   if (ids.length) {
     const { data: photos } = await supabase
-      .from("laji_photos")
-      .select("id, laji_id, storage_path, sort_order")
-      .in("laji_id", ids)
+      .from("event_photos")
+      .select("id, event_id, storage_path, sort_order")
+      .in("event_id", ids)
       .order("sort_order");
 
     const all = photos ?? [];
     const urls = await signPaths(supabase, all.map((p) => p.storage_path));
     for (const ph of all) {
-      const arr = byLaji.get(ph.laji_id) ?? [];
+      const arr = byevent.get(ph.event_id) ?? [];
       arr.push({
         id: ph.id,
         storage_path: ph.storage_path,
         sort_order: ph.sort_order,
         url: urls.get(ph.storage_path) ?? null,
       });
-      byLaji.set(ph.laji_id, arr);
+      byevent.set(ph.event_id, arr);
     }
   }
 
@@ -44,21 +44,21 @@ export async function listLajit(): Promise<Laji[]> {
     id: l.id,
     ordinal: l.ordinal,
     name: l.name,
-    photos: byLaji.get(l.id) ?? [],
+    photos: byevent.get(l.id) ?? [],
   }));
 }
 
-// Returns the new laji's id + ordinal so the caller can keep working with it
+// Returns the new event's id + ordinal so the caller can keep working with it
 // (upload photos, then enter scores).
-export async function createLaji(
+export async function createevent(
   name: string,
 ): Promise<{ id: string; ordinal: number }> {
   const { supabase, spaceId } = await requireSpace();
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("Lajin nimi puuttuu.");
+  if (!trimmed) throw new Error("eventn nimi puuttuu.");
 
   const { data: max } = await supabase
-    .from("lajit")
+    .from("eventt")
     .select("ordinal")
     .order("ordinal", { ascending: false })
     .limit(1)
@@ -66,7 +66,7 @@ export async function createLaji(
   const ordinal = (max?.ordinal ?? 0) + 1;
 
   const { data, error } = await supabase
-    .from("lajit")
+    .from("eventt")
     .insert({ space_id: spaceId, name: trimmed, ordinal })
     .select("id, ordinal")
     .single();
@@ -76,7 +76,7 @@ export async function createLaji(
   return { id: data.id, ordinal: data.ordinal };
 }
 
-export async function updateLaji(
+export async function updateevent(
   id: string,
   fields: { name?: string; ordinal?: number },
 ): Promise<void> {
@@ -86,38 +86,38 @@ export async function updateLaji(
   if (fields.ordinal !== undefined) patch.ordinal = fields.ordinal;
   if (Object.keys(patch).length === 0) return;
 
-  const { error } = await supabase.from("lajit").update(patch).eq("id", id);
+  const { error } = await supabase.from("eventt").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/o");
 }
 
-// Pass the laji ids in the order you want; ordinal becomes index + 1.
-export async function reorderLajit(orderedIds: string[]): Promise<void> {
+// Pass the event ids in the order you want; ordinal becomes index + 1.
+export async function reordereventt(orderedIds: string[]): Promise<void> {
   const { supabase } = await requireSpace();
   await Promise.all(
     orderedIds.map((id, i) =>
-      supabase.from("lajit").update({ ordinal: i + 1 }).eq("id", id),
+      supabase.from("eventt").update({ ordinal: i + 1 }).eq("id", id),
     ),
   );
   revalidatePath("/o");
 }
 
-export async function deleteLaji(id: string): Promise<void> {
+export async function deleteevent(id: string): Promise<void> {
   const { supabase } = await requireSpace();
   const { data: photos } = await supabase
-    .from("laji_photos")
+    .from("event_photos")
     .select("storage_path")
-    .eq("laji_id", id);
+    .eq("event_id", id);
 
-  const { error } = await supabase.from("lajit").delete().eq("id", id);
+  const { error } = await supabase.from("eventt").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
   await deleteImages(supabase, (photos ?? []).map((p) => p.storage_path));
   revalidatePath("/o");
 }
 
-export async function addLajiPhoto(
-  lajiId: string,
+export async function addeventPhoto(
+  eventId: string,
   formData: FormData,
 ): Promise<void> {
   const { supabase, spaceId } = await requireSpace();
@@ -126,20 +126,20 @@ export async function addLajiPhoto(
     throw new Error("Kuva puuttuu.");
   }
 
-  const path = await uploadImage(supabase, spaceId, "lajit", file);
+  const path = await uploadImage(supabase, spaceId, "eventt", file);
 
   const { data: max } = await supabase
-    .from("laji_photos")
+    .from("event_photos")
     .select("sort_order")
-    .eq("laji_id", lajiId)
+    .eq("event_id", eventId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
   const sort_order = (max?.sort_order ?? 0) + 1;
 
-  const { error } = await supabase.from("laji_photos").insert({
+  const { error } = await supabase.from("event_photos").insert({
     space_id: spaceId,
-    laji_id: lajiId,
+    event_id: eventId,
     storage_path: path,
     sort_order,
   });
@@ -147,16 +147,16 @@ export async function addLajiPhoto(
   revalidatePath("/o");
 }
 
-export async function deleteLajiPhoto(photoId: string): Promise<void> {
+export async function deleteeventPhoto(photoId: string): Promise<void> {
   const { supabase } = await requireSpace();
   const { data: photo } = await supabase
-    .from("laji_photos")
+    .from("event_photos")
     .select("storage_path")
     .eq("id", photoId)
     .maybeSingle();
 
   const { error } = await supabase
-    .from("laji_photos")
+    .from("event_photos")
     .delete()
     .eq("id", photoId);
   if (error) throw new Error(error.message);

@@ -1,40 +1,16 @@
-// Shared shapes returned by the database actions.
-// `*_url` fields are signed Storage URLs attached at read time (not columns).
+import "server-only";
+import { redirect } from "next/navigation";
+import { getSession } from "./session";
+import { scopedClient } from "@/lib/supabase/scoped";
 
-export interface Player {
-  id: string;
-  name: string;
-  photo_path: string | null;
-  photo_url: string | null;
-}
-
-export interface LajiPhoto {
-  id: string;
-  storage_path: string;
-  sort_order: number;
-  url: string | null;
-}
-
-export interface Laji {
-  id: string;
-  ordinal: number;
-  name: string;
-  photos: LajiPhoto[];
-}
-
-export interface LeaderboardRow {
-  player_id: string;
-  name: string;
-  photo_path: string | null;
-  photo_url: string | null;
-  total_points: number;
-}
-
-export interface LajiResultRow {
-  player_id: string;
-  name: string;
-  photo_path: string | null;
-  photo_url: string | null;
-  points: number | null;     // null = no score entered yet
-  placement: number | null;  // null = unscored
+// Every database action starts here: turn the session cookie into an
+// RLS-scoped Supabase client plus the current space id. No session → bounce
+// to the landing (middleware already guards /o, this is belt-and-braces).
+export async function requireSpace() {
+  const session = await getSession();
+  if (!session) redirect("/");
+  return {
+    supabase: scopedClient(session.token),
+    spaceId: session.spaceId,
+  };
 }
