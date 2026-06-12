@@ -38,6 +38,7 @@
            rounded-xl px-4 py-2.5 text-sm font-semibold
            transition-colors select-none disabled:opacity-60;
   }
+  
 
   /* Primary = warm wine → plum on hover. The most-used action color. */
   .btn-primary {
@@ -80,4 +81,18 @@
           px-3.5 text-ink placeholder:text-wine/50
           focus:border-wine focus:outline-2 focus:outline-wine;
   }
+}
+
+/* Leaderboard motion. Keep them gentle so the page feels lively, not busy. */
+@keyframes pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+@keyframes bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-4px); }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(200%); } /* sweep, then long pause */
 }
