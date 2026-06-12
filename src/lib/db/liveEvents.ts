@@ -336,9 +336,10 @@ export interface RevealAnswer {
   answer_id: string;
   player_id: string;
   player_name: string;
+  player_photo_url: string | null; // ← add this
   text: string | null;
-  photo_url: string | null;      // first photo (back-compat / single display)
-  photo_urls: string[];          // all photos for this answer
+  photo_url: string | null;
+  photo_urls: string[];
 }
 export interface RevealQuestion {
   id: string;
@@ -363,7 +364,7 @@ export async function getLiveReveal(
   const { data: answers } = await supabase
     .from("live_answers")
     .select(
-      "id, question_id, player_id, answer_text, answer_path, answer_paths, players(name)",
+      "id, question_id, player_id, answer_text, answer_path, answer_paths, players(name, photo_path)",
     )
     .eq("live_event_id", liveEventId)
     .eq("space_id", spaceId);
@@ -397,6 +398,7 @@ export async function getLiveReveal(
           answer_id: a.id,
           player_id: a.player_id,
           player_name: a.players?.name ?? "",
+          player_photo_url: a.players?.photo_path ? urls.get(a.players.photo_path) ?? null : null,
           text: a.answer_text,
           photo_url: photo_urls[0] ?? null,
           photo_urls,
