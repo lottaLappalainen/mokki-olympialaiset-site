@@ -4,23 +4,16 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PhotoLightbox from "@/components/PhotoLightbox";
-import { submitVotes } from "@/lib/db/liveEvents";
-
-export interface VotableAnswer {
-  answer_id: string;
-  text: string | null;
-  photo_url: string | null;
-}
+import { submitVotes, type RevealQuestion } from "@/lib/db/liveEvents";
 
 interface LiveVotingProps {
   liveEventId: string;
   voterId: string;
-  answers: VotableAnswer[]; // anonymous, already photo-signed
+  questions: RevealQuestion[]; // grouped answers, per question
   options: { id: string; value: number }[];
   onDone: () => void;
 }
 
-// Stable shuffle seeded by voterId so the order doesn't reshuffle on re-render.
 function shuffled<T>(arr: T[], seed: string): T[] {
   const a = [...arr];
   let h = 5381;
@@ -36,23 +29,41 @@ function shuffled<T>(arr: T[], seed: string): T[] {
 export default function LiveVoting({
   liveEventId,
   voterId,
-  answers,
+  questions,
   options,
   onDone,
 }: LiveVotingProps) {
   const router = useRouter();
-  const ordered = useMemo(() => shuffled(answers, voterId), [answers, voterId]);
-  // answer_id → chosen value (as string; "" = none)
+
+  const shuffledByQuestion = useMemo(
+    () =>
+      questions.map((q) => ({
+        question: q,
+        answers: shuffled(q.answers, voterId + q.id),
+      })),
+    [questions, voterId],
+  );
+
   const [ballot, setBallot] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // lightbox holds a list of photos + the index tapped (so multi-photo answers
+  // open as a swipeable set)
+  const [lightbox, setLightbox] = useState<{ urls: string[]; at: number } | null>(
+    null,
+  );
   const [busy, startTransition] = useTransition();
-
-  // values already used somewhere in the ballot (each option once)
-  const usedValues = new Set(Object.values(ballot).filter((v) => v !== ""));
 
   function setVote(answerId: string, value: string) {
     setBallot((prev) => ({ ...prev, [answerId]: value }));
+  }
+
+  function usedInQuestion(answerIds: string[]): Set<string> {
+    const used = new Set<string>();
+    for (const aid of answerIds) {
+      const v = ballot[aid];
+      if (v) used.add(v);
+    }
+    return used;
   }
 
   function save() {
@@ -68,68 +79,85 @@ export default function LiveVoting({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm font-semibold text-wine">Äänestä</p>
-      <p className="text-ink text-sm">
-        Anna jokaiselle vastaukselle pisteet. Voit käyttää kunkin pistemäärän
-        vain kerran.
-      </p>
-
-      <div className="flex flex-col gap-2">
-        {ordered.map((a, idx) => {
-          const mine = ballot[a.answer_id] ?? "";
-          return (
-            <div key={a.answer_id} className="card flex items-center gap-3">
-              <span className="text-xs font-bold text-wine shrink-0">
-                #{idx + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                {a.photo_url ? (
-                  <img
-                    src={a.photo_url}
-                    alt=""
-                    loading="lazy"
-                    onClick={() => setLightboxUrl(a.photo_url)}
-                    className="w-full h-24 object-cover rounded-lg cursor-pointer"
-                  />
-                ) : (
-                  <p className="text-ink truncate">{a.text}</p>
-                )}
-              </div>
-              {/* dropdown shows only unused options (plus the current pick) */}
-              <select
-                className="input w-20 shrink-0"
-                value={mine}
-                onChange={(e) => setVote(a.answer_id, e.target.value)}
-              >
-                <option value="">–</option>
-                {options
-                  .filter(
-                    (o) =>
-                      !usedValues.has(String(o.value)) ||
-                      String(o.value) === mine,
-                  )
-                  .map((o) => (
-                    <option key={o.id} value={String(o.value)}>
-                      {o.value}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          );
-        })}
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-sm font-semibold text-wine">Äänestä</p>
+        <p className="text-ink text-sm">
+          Anna jokaiselle vastaukselle pisteet. Voit käyttää kunkin pistemäärän
+          kerran per kysymys.
+        </p>
       </div>
 
-      <button
-        className="btn btn-primary"
-        disabled={busy}
-        onClick={() => setConfirmOpen(true)}
-      >
-        Tallenna äänet
-      </button>
-      <button className="btn btn-outline" onClick={onDone}>
-        Peruuta
-      </button>
+      {shuffledByQuestion.map(({ question, answers }) => {
+        const answerIds = answers.map((a) => a.answer_id);
+        const used = usedInQuestion(answerIds);
+        return (
+          <div key={question.id} className="flex flex-col gap-2">
+            <p className="font-semibold text-ink">{question.prompt}</p>
+            {answers.map((a, idx) => {
+              const mine = ballot[a.answer_id] ?? "";
+              const photos = a.photo_urls ?? [];
+              return (
+                <div key={a.answer_id} className="card flex items-center gap-3">
+                  <span className="text-xs font-bold text-wine shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {photos.length > 0 ? (
+                      // show ALL photos for this answer
+                      <div className="grid grid-cols-3 gap-1">
+                        {photos.map((url, pi) => (
+                          <img
+                            key={pi}
+                            src={url}
+                            alt=""
+                            loading="lazy"
+                            onClick={() => setLightbox({ urls: photos, at: pi })}
+                            className="w-full aspect-square object-cover rounded-lg cursor-pointer"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-ink truncate">{a.text}</p>
+                    )}
+                  </div>
+                  <select
+                    className="input w-20 shrink-0"
+                    value={mine}
+                    onChange={(e) => setVote(a.answer_id, e.target.value)}
+                  >
+                    <option value="">–</option>
+                    {options
+                      .filter(
+                        (o) =>
+                          !used.has(String(o.value)) ||
+                          String(o.value) === mine,
+                      )
+                      .map((o) => (
+                        <option key={o.id} value={String(o.value)}>
+                          {o.value}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      <div className="flex flex-col gap-2">
+        <button
+          className="btn btn-primary"
+          disabled={busy}
+          onClick={() => setConfirmOpen(true)}
+        >
+          Tallenna äänet
+        </button>
+        <button className="btn btn-outline" onClick={onDone}>
+          Peruuta
+        </button>
+      </div>
 
       <ConfirmDialog
         open={confirmOpen}
@@ -140,11 +168,11 @@ export default function LiveVoting({
         onCancel={() => setConfirmOpen(false)}
       />
 
-      {/* Tap a photo → open it big */}
-      {lightboxUrl && (
+      {lightbox && (
         <PhotoLightbox
-          photos={[{ url: lightboxUrl, name: "kuva.jpg" }]}
-          onClose={() => setLightboxUrl(null)}
+          photos={lightbox.urls.map((url, i) => ({ url, name: `kuva-${i + 1}.jpg` }))}
+          startIndex={lightbox.at}
+          onClose={() => setLightbox(null)}
         />
       )}
     </div>

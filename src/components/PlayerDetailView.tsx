@@ -7,6 +7,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import PlayerAvatar from "@/components/PlayerAvatar";
 import PlayerForm from "@/components/PlayerForm";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import PhotoLightbox from "@/components/PhotoLightbox";
 import { updatePlayer, setPlayerPhoto, deletePlayer } from "@/lib/db/players";
 import type { PlayerDetail } from "@/lib/db/reads";
 
@@ -17,8 +18,6 @@ interface PendingAction {
   run: () => Promise<void>;
 }
 
-// NOTE: this list of players lives at /o/pelaajat in your nav. If your actual
-// players-list route differs, change BACK_HREF (and the delete redirect below).
 const BACK_HREF = "/o/pelaajat";
 
 export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
@@ -26,6 +25,7 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, startTransition] = useTransition();
+  const [showPhoto, setShowPhoto] = useState(false); // big-avatar lightbox
 
   function confirmRun() {
     if (!pending) return;
@@ -88,17 +88,25 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
       </Link>
 
       <div className="flex flex-col items-center gap-3 mb-6">
-        {/* seed={detail.id} keeps a photo-less circle's color stable per player */}
-        <PlayerAvatar
-          name={detail.name}
-          photoUrl={detail.photo_url}
-          seed={detail.id}
-          size={112}
-        />
+        {/* Big avatar → opens the photo in a lightbox (with download).
+            Only clickable when there's actually a photo. */}
+        <button
+          onClick={() => detail.photo_url && setShowPhoto(true)}
+          disabled={!detail.photo_url}
+          aria-label="Näytä kuva"
+          className="rounded-full"
+        >
+          <PlayerAvatar
+            name={detail.name}
+            photoUrl={detail.photo_url}
+            seed={detail.id}
+            size={112}
+          />
+        </button>
+
         <h1 className="text-2xl font-bold text-ink text-center">{detail.name}</h1>
-        {/* text-teal-600 sits inside this on-bg block; switch to text-ink if you
-            want it black like the other on-background text */}
-        <p className="text-teal-600 font-semibold">
+        {/* on-background text → ink (black), per the design rule */}
+        <p className="text-ink font-semibold">
           Yhteensä {detail.total} pistettä
         </p>
         <div className="flex gap-2">
@@ -131,11 +139,11 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
       ) : (
         <div className="flex flex-col gap-2">
           {detail.scores.map((s) => (
-            // Each event row is now a link to that event's detail page.
+            // Each event row links to that event's detail page.
             <Link
               key={s.event_id}
               href={`/o/historia/${s.event_id}`}
-              className="card flex items-center gap-3 py-3"
+              className="card card-link flex items-center gap-3 py-3"
             >
               <div className="text-xs font-semibold text-wine shrink-0">
                 Laji {s.ordinal}
@@ -143,12 +151,20 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
               <span className="flex-1 min-w-0 font-semibold text-ink truncate">
                 {s.name}
               </span>
-              <span className="text-lg font-bold text-teal-600 shrink-0">
+              <span className="text-lg font-bold text-wine shrink-0">
                 {s.points}
               </span>
             </Link>
           ))}
         </div>
+      )}
+
+      {/* Fullscreen photo viewer (arrows N/A for one image, download built in) */}
+      {showPhoto && detail.photo_url && (
+        <PhotoLightbox
+          photos={[{ url: detail.photo_url, name: `${detail.name}.jpg` }]}
+          onClose={() => setShowPhoto(false)}
+        />
       )}
 
       <ConfirmDialog
