@@ -19,7 +19,7 @@ export default async function historyPage() {
 
       {events.length === 0 ? (
         <div className="card text-center text-teal-600">
-          Ei vielä lajeja. Luo ensimmäinen Loki-välilehdeltä.
+          Ei vielä lajeja. Luo ensimmäinen kirjaa laji välilehdeltä.
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -42,7 +42,7 @@ export default async function historyPage() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-wine">
-                  event {event.ordinal}
+                  laji {event.ordinal}
                 </p>
                 <p className="font-semibold text-ink truncate">{event.name}</p>
               </div>

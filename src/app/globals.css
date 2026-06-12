@@ -109,4 +109,29 @@
   50%      { background-position: 100% 50%; }
 }
 
+/* ── Main title: animated gradient text ── */
+@keyframes titleGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+@layer components {
+  .main-title {
+    @apply text-4xl font-extrabold text-center mb-1 tracking-tight;
+    background: linear-gradient(
+      120deg,
+      var(--color-ink)    0%,
+      var(--color-wine)   30%,
+      var(--color-plum)   50%,
+      var(--color-teal-600) 70%,
+      var(--color-ink)    100%
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titleGradient 5s ease infinite;
+    margin-bottom: 0.8em;
+  }
+}
 

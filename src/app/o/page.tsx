@@ -5,26 +5,31 @@ import LiveEventBanner from "@/components/LiveEventBanner";
 import { getLeaderboard } from "@/lib/db/reads";
 import { listSpacePhotos, getSpaceHeader } from "@/lib/db/settings";
 import { getLiveEvent } from "@/lib/db/liveEvents";
+import { listevents } from "@/lib/db/events";
 
 export default async function LeaderboardPage() {
-  const [rows, photos, header, live] = await Promise.all([
+  const [rows, events, spacePhotos, header, live] = await Promise.all([
     getLeaderboard(),
+    listevents(),
     listSpacePhotos(),
     getSpaceHeader(),
-    getLiveEvent(), // the single live event, or null
+    getLiveEvent(),
   ]);
+
+  const allPhotos = [
+    ...events.flatMap((e) => e.photos),
+    ...spacePhotos,
+  ].filter((p) => p.url);
 
   return (
     <>
-      {/* If a live event is running, show the shining banner INSTEAD of the
-          carousel. Otherwise the carousel (which renders nothing if empty). */}
       {live ? (
         <LiveEventBanner live={live} />
       ) : (
-        <PhotoCarousel photos={photos} />
+        <PhotoCarousel photos={allPhotos} />
       )}
 
-      <h1 className="text-3xl font-extrabold text-ink text-center mb-1">
+      <h1 className="main-title">
         {header || "Olympialaiset"}
       </h1>
       <PageHeader title="Pistetilanne" />

@@ -28,7 +28,6 @@ export default function LandingPage() {
   function handleJoin() {
     setError(null);
     startTransition(async () => {
-      // On success joinSpace redirects to /o; only failures return here.
       const result = await joinSpace(code);
       if (result?.error) setError(result.error);
     });
@@ -47,10 +46,10 @@ export default function LandingPage() {
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-center text-ink mb-1">
+        <h1 className="main-title mb-1">
           Olympialaiset
         </h1>
-        <p className="text-center text-teal-600 mb-8">
+        <p className="text-center text-plum mb-8">
           Luo tai liity koodilla
         </p>
 

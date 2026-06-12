@@ -32,8 +32,6 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
 
   return (
     <>
-      {/* Code */}
-      <div className="card-accent text-center mb-6">
           {/* Code banner: animated wine→plum→teal gradient */}
           <div
             className="rounded-2xl p-5 mb-6 text-center text-paper
@@ -51,14 +49,9 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
               {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
             </p>
           </div>
-        <p className="text-sm text-teal-600 mt-3 flex items-center justify-center gap-1.5">
-          {copied ? <Check size={15} /> : <Copy size={15} />}
-          {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
-        </p>
-      </div>
 
       {/* Players */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-7">
         <h2 className="font-bold text-ink">Pelaajat</h2>
         <button
           className="btn btn-primary px-3 py-1.5 text-sm"
@@ -70,7 +63,7 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
       </div>
 
       {players.length === 0 ? (
-        <p className="text-teal-600 mb-6">Ei vielä pelaajia.</p>
+        <p className="text-plum-600 mb-6">Ei vielä pelaajia.</p>
       ) : (
         <div className="grid grid-cols-3 gap-3 mb-6">
           {players.map((p) => (

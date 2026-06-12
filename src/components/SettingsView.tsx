@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import PhotoGallery from "@/components/PhotoGallery";
 import PhotoUploader from "@/components/PhotoUploader";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -27,10 +27,9 @@ interface PendingAction {
 interface SettingsViewProps {
   options: PointOption[];
   photos: SpacePhoto[];
-  header: string; // current spaces.name
+  header: string;
 }
 
-// PhotoGallery expects items with id + url; space photos fit that shape.
 type GalleryPhoto = {
   id: string;
   storage_path: string;
@@ -47,22 +46,15 @@ export default function SettingsView({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, startTransition] = useTransition();
 
-  // Header (olympics title, stored in spaces.name)
   const [header, setHeader] = useState(initialHeader);
-
-  // New-option inputs
   const [newValue, setNewValue] = useState("");
   const [newLabel, setNewLabel] = useState("");
-
-  // Which option row is being edited, plus its draft fields
   const [editId, setEditId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editLabel, setEditLabel] = useState("");
-
-  // New space photos chosen in the uploader (already compressed client-side)
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
-  // Bumping this clears the uploader's own previews after a save (no doubles).
   const [photoResetKey, setPhotoResetKey] = useState(0);
+  const [pointsOpen, setPointsOpen] = useState(false);
 
   function confirmRun() {
     if (!pending) return;
@@ -81,7 +73,7 @@ export default function SettingsView({
 
   return (
     <div className="flex flex-col gap-8">
-      {/* ── Olympics header (spaces.name) ────────────────────────────────── */}
+      {/* ── Olympics header ───────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <h2 className="font-bold text-ink">Olympialaisten otsikko</h2>
         <input
@@ -95,7 +87,7 @@ export default function SettingsView({
           disabled={busy}
           onClick={() =>
             startTransition(async () => {
-              await updateSpaceHeader(header); // saved to spaces.name
+              await updateSpaceHeader(header);
               router.refresh();
             })
           }
@@ -104,10 +96,9 @@ export default function SettingsView({
         </button>
       </section>
 
-      {/* ── Olympics-wide photos ─────────────────────────────────────────── */}
+      {/* ── Olympics-wide photos ──────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <h2 className="font-bold text-ink">Olympialaisten kuvat</h2>
-
         <PhotoGallery
           photos={photos as GalleryPhoto[]}
           onRequestDelete={(photoId) =>
@@ -118,7 +109,6 @@ export default function SettingsView({
             })
           }
         />
-
         <PhotoUploader
           multiple
           label="Lisää kuvia"
@@ -137,7 +127,7 @@ export default function SettingsView({
                   await addSpacePhoto(fd);
                 }
                 setNewPhotos([]);
-                setPhotoResetKey((k) => k + 1); // clear previews → no duplicates
+                setPhotoResetKey((k) => k + 1);
                 router.refresh();
               })
             }
@@ -147,128 +137,143 @@ export default function SettingsView({
         )}
       </section>
 
-      {/* ── Point options ────────────────────────────────────────────────── */}
+      {/* ── Point options ─────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
-        <h2 className="font-bold text-ink">Sallitut pisteet</h2>
-        <p className="text-ink text-sm">
-          Kun lisäät arvoja, pisteet valitaan näistä pudotusvalikosta. Ilman
-          arvoja pisteet syötetään vapaasti.
-        </p>
+        <button
+          className="flex items-center justify-between w-full text-left"
+          onClick={() => setPointsOpen((o) => !o)}
+        >
+          <h2 className="font-bold text-ink">Sallitut pisteet</h2>
+          {pointsOpen ? (
+            <ChevronUp size={20} className="text-ink shrink-0" />
+          ) : (
+            <ChevronDown size={20} className="text-ink shrink-0" />
+          )}
+        </button>
 
-        <div className="flex flex-col gap-2">
-          {options.map((o) => (
-            <div key={o.id} className="card flex items-center gap-2 py-3">
-              {editId === o.id ? (
-                <>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className="input w-20 text-center"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                  />
-                  <input
-                    className="input flex-1 min-w-0"
-                    placeholder="Nimi (valinnainen)"
-                    value={editLabel}
-                    onChange={(e) => setEditLabel(e.target.value)}
-                  />
-                  <button
-                    aria-label="Tallenna"
-                    className="btn btn-primary px-3 shrink-0"
-                    onClick={() =>
-                      setPending({
-                        title: "Tallenna muutos?",
-                        run: async () => {
-                          await updatePointOption(o.id, {
-                            value: parseInt(editValue, 10) || 0,
-                            label: editLabel,
-                          });
-                          setEditId(null);
-                        },
-                      })
-                    }
-                  >
-                    <Check size={18} />
-                  </button>
-                  <button
-                    aria-label="Peruuta"
-                    className="btn btn-soft px-3 shrink-0"
-                    onClick={() => setEditId(null)}
-                  >
-                    <X size={18} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="font-bold text-ink w-12 text-center shrink-0">
-                    {o.value}
-                  </span>
-                  <span className="flex-1 min-w-0 text-ink truncate">
-                    {o.label ?? ""}
-                  </span>
-                  <button
-                    aria-label="Muokkaa"
-                    className="btn btn-outline px-3 shrink-0"
-                    onClick={() => startEdit(o)}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    aria-label="Poista"
-                    className="btn btn-accent px-3 shrink-0"
-                    onClick={() =>
-                      setPending({
-                        title: "Poista pistearvo?",
-                        message: `Arvo ${o.value} poistetaan valikosta.`,
-                        destructive: true,
-                        run: () => deletePointOption(o.id),
-                      })
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </>
+        {pointsOpen && (
+          <>
+            <p className="text-ink text-sm">
+              Kun lisäät arvoja, pisteet valitaan näistä pudotusvalikosta. Ilman
+              arvoja pisteet syötetään vapaasti.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {options.map((o) => (
+                <div key={o.id} className="card flex items-center gap-2 py-3">
+                  {editId === o.id ? (
+                    <>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        className="input w-20 text-center"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                      />
+                      <input
+                        className="input flex-1 min-w-0"
+                        placeholder="Nimi (valinnainen)"
+                        value={editLabel}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                      />
+                      <button
+                        aria-label="Tallenna"
+                        className="btn btn-primary px-3 shrink-0"
+                        onClick={() =>
+                          setPending({
+                            title: "Tallenna muutos?",
+                            run: async () => {
+                              await updatePointOption(o.id, {
+                                value: parseInt(editValue, 10) || 0,
+                                label: editLabel,
+                              });
+                              setEditId(null);
+                            },
+                          })
+                        }
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        aria-label="Peruuta"
+                        className="btn btn-soft px-3 shrink-0"
+                        onClick={() => setEditId(null)}
+                      >
+                        <X size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-ink w-12 text-center shrink-0">
+                        {o.value}
+                      </span>
+                      <span className="flex-1 min-w-0 text-ink truncate">
+                        {o.label ?? ""}
+                      </span>
+                      <button
+                        aria-label="Muokkaa"
+                        className="btn btn-outline px-3 shrink-0"
+                        onClick={() => startEdit(o)}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        aria-label="Poista"
+                        className="btn btn-accent px-3 shrink-0"
+                        onClick={() =>
+                          setPending({
+                            title: "Poista pistearvo?",
+                            message: `Arvo ${o.value} poistetaan valikosta.`,
+                            destructive: true,
+                            run: () => deletePointOption(o.id),
+                          })
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {options.length === 0 && (
+                <p className="text-ink text-sm">Ei vielä pistearvoja.</p>
               )}
             </div>
-          ))}
-          {options.length === 0 && (
-            <p className="text-ink text-sm">Ei vielä pistearvoja.</p>
-          )}
-        </div>
 
-        {/* Add new option */}
-        <div className="card flex items-center gap-2 py-3">
-          <input
-            type="number"
-            inputMode="numeric"
-            className="input w-20 text-center"
-            placeholder="Pisteet"
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-          />
-          <input
-            className="input flex-1 min-w-0"
-            placeholder="Nimi (valinnainen)"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-          />
-          <button
-            aria-label="Lisää pistearvo"
-            className="btn btn-primary px-3 shrink-0"
-            disabled={busy || newValue.trim() === ""}
-            onClick={() =>
-              startTransition(async () => {
-                await createPointOption(parseInt(newValue, 10) || 0, newLabel);
-                setNewValue("");
-                setNewLabel("");
-                router.refresh();
-              })
-            }
-          >
-            <Plus size={18} />
-          </button>
-        </div>
+            {/* Add new option */}
+            <div className="card flex items-center gap-2 py-3">
+              <input
+                type="number"
+                inputMode="numeric"
+                className="input w-20 text-center"
+                placeholder="Pisteet"
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+              />
+              <input
+                className="input flex-1 min-w-0"
+                placeholder="Nimi (valinnainen)"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+              />
+              <button
+                aria-label="Lisää pistearvo"
+                className="btn btn-primary px-3 shrink-0"
+                disabled={busy || newValue.trim() === ""}
+                onClick={() =>
+                  startTransition(async () => {
+                    await createPointOption(parseInt(newValue, 10) || 0, newLabel);
+                    setNewValue("");
+                    setNewLabel("");
+                    router.refresh();
+                  })
+                }
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
       <ConfirmDialog
