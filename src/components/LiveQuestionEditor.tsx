@@ -103,14 +103,6 @@ export default function LiveQuestionEditor({
               />
               Pakollinen
             </label>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={q.anonymous}
-                onChange={(e) => patch(i, { anonymous: e.target.checked })}
-              />
-              Nimetön
-            </label>
           </div>
         </div>
       ))}
