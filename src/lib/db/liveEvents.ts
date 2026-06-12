@@ -13,6 +13,7 @@ export interface LiveQuestion {
   answer_type: AnswerType;
   required: boolean;
   anonymous: boolean;
+  photo_count: number | null; // exactly-N for photo questions; null otherwise
   sort_order: number;
 }
 
@@ -21,6 +22,8 @@ export interface LiveEvent {
   name: string;
   is_live: boolean;
   revealed: boolean;
+  has_voting: boolean;
+  results_revealed: boolean;
   questions: LiveQuestion[];
 }
 
@@ -30,6 +33,7 @@ export interface QuestionDraft {
   answer_type: AnswerType;
   required: boolean;
   anonymous: boolean;
+  photo_count?: number; // only meaningful when answer_type === "photo"
 }
 
 // ── Reads: events ─────────────────────────────────────────────────────────────
@@ -39,7 +43,7 @@ export async function getLiveEvent(): Promise<LiveEvent | null> {
   const { supabase, spaceId } = await requireSpace();
   const { data: ev } = await supabase
     .from("live_events")
-    .select("id, name, is_live, revealed")
+    .select("id, name, is_live, revealed, has_voting, results_revealed")
     .eq("space_id", spaceId)
     .eq("is_live", true)
     .maybeSingle();
@@ -50,14 +54,12 @@ export async function getLiveEvent(): Promise<LiveEvent | null> {
 // One live event by id (live or ended) with its questions — detail view.
 export async function getLiveEventDetail(id: string): Promise<LiveEvent | null> {
   const { supabase, spaceId } = await requireSpace();
-  console.log("READ DETAIL — spaceId:", spaceId, "| looking for id:", id);
-  const { data: ev, error } = await supabase
+  const { data: ev } = await supabase
     .from("live_events")
-    .select("id, name, is_live, revealed")
+    .select("id, name, is_live, revealed, has_voting, results_revealed")
     .eq("id", id)
     .eq("space_id", spaceId)
     .maybeSingle();
-  console.log("READ DETAIL — found:", ev, "| error:", error);
   if (!ev) return null;
   return { ...ev, questions: await loadQuestions(ev.id, spaceId) };
 }
@@ -67,7 +69,7 @@ export async function listEndedLiveEvents(): Promise<LiveEvent[]> {
   const { supabase, spaceId } = await requireSpace();
   const { data } = await supabase
     .from("live_events")
-    .select("id, name, is_live, revealed")
+    .select("id, name, is_live, revealed, has_voting, results_revealed")
     .eq("space_id", spaceId)
     .eq("is_live", false)
     .order("created_at", { ascending: false });
@@ -82,7 +84,7 @@ async function loadQuestions(
   const { supabase } = await requireSpace();
   const { data } = await supabase
     .from("live_questions")
-    .select("id, prompt, answer_type, required, anonymous, sort_order")
+    .select("id, prompt, answer_type, required, anonymous, photo_count, sort_order")
     .eq("live_event_id", liveEventId)
     .eq("space_id", spaceId)
     .order("sort_order");
@@ -95,9 +97,9 @@ async function loadQuestions(
 export async function createLiveEvent(
   name: string,
   questions: QuestionDraft[],
+  hasVoting: boolean,
 ): Promise<{ id: string }> {
   const { supabase, spaceId } = await requireSpace();
-  console.log("CREATE — spaceId:", spaceId);
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Anna tapahtumalle nimi.");
 
@@ -109,7 +111,12 @@ export async function createLiveEvent(
 
   const { data: ev, error } = await supabase
     .from("live_events")
-    .insert({ space_id: spaceId, name: trimmed, is_live: true })
+    .insert({
+      space_id: spaceId,
+      name: trimmed,
+      is_live: true,
+      has_voting: hasVoting,
+    })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
@@ -123,6 +130,7 @@ export async function createLiveEvent(
       answer_type: q.answer_type,
       required: q.required,
       anonymous: q.anonymous,
+      photo_count: q.answer_type === "photo" ? q.photo_count ?? 1 : null,
       sort_order: i + 1,
     }));
   if (rows.length) {
@@ -160,7 +168,7 @@ export async function setLiveEventLive(
   revalidatePath("/o");
 }
 
-// Toggle answering ↔ revealed.
+// Toggle answering ↔ revealed (answers).
 export async function setLiveEventRevealed(
   id: string,
   revealed: boolean,
@@ -169,6 +177,21 @@ export async function setLiveEventRevealed(
   const { error } = await supabase
     .from("live_events")
     .update({ revealed })
+    .eq("id", id)
+    .eq("space_id", spaceId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/o");
+}
+
+// Toggle results hidden ↔ revealed (second gate, voting events).
+export async function setLiveEventResultsRevealed(
+  id: string,
+  resultsRevealed: boolean,
+): Promise<void> {
+  const { supabase, spaceId } = await requireSpace();
+  const { error } = await supabase
+    .from("live_events")
+    .update({ results_revealed: resultsRevealed })
     .eq("id", id)
     .eq("space_id", spaceId);
   if (error) throw new Error(error.message);
@@ -196,6 +219,7 @@ export async function replaceLiveQuestions(
       answer_type: q.answer_type,
       required: q.required,
       anonymous: q.anonymous,
+      photo_count: q.answer_type === "photo" ? q.photo_count ?? 1 : null,
       sort_order: i + 1,
     }));
   if (rows.length) {
@@ -246,6 +270,7 @@ export async function getAnsweredPlayerIds(
 }
 
 // Submit a player's whole form = final, locking save.
+// Photo questions may carry MULTIPLE files (q_{id} repeated) → answer_paths[].
 export async function submitLiveAnswers(
   liveEventId: string,
   playerId: string,
@@ -270,10 +295,13 @@ export async function submitLiveAnswers(
   const rows: any[] = [];
   for (const q of questions ?? []) {
     if (q.answer_type === "photo") {
-      const file = formData.get(`q_${q.id}`);
-      let answer_path: string | null = null;
-      if (file instanceof File && file.size > 0) {
-        answer_path = await uploadImage(supabase, spaceId, "live", file);
+      // collect ALL files submitted for this question
+      const files = formData
+        .getAll(`q_${q.id}`)
+        .filter((f): f is File => f instanceof File && f.size > 0);
+      const paths: string[] = [];
+      for (const file of files) {
+        paths.push(await uploadImage(supabase, spaceId, "live", file));
       }
       rows.push({
         space_id: spaceId,
@@ -281,7 +309,8 @@ export async function submitLiveAnswers(
         question_id: q.id,
         player_id: playerId,
         answer_text: null,
-        answer_path,
+        answer_path: paths[0] ?? null, // keep first in old column for safety
+        answer_paths: paths.length ? paths : null,
       });
     } else {
       const value = String(formData.get(`q_${q.id}`) ?? "").trim();
@@ -292,6 +321,7 @@ export async function submitLiveAnswers(
         player_id: playerId,
         answer_text: value || null,
         answer_path: null,
+        answer_paths: null,
       });
     }
   }
@@ -307,7 +337,8 @@ export interface RevealAnswer {
   player_id: string;
   player_name: string;
   text: string | null;
-  photo_url: string | null;
+  photo_url: string | null;      // first photo (back-compat / single display)
+  photo_urls: string[];          // all photos for this answer
 }
 export interface RevealQuestion {
   id: string;
@@ -331,14 +362,19 @@ export async function getLiveReveal(
 
   const { data: answers } = await supabase
     .from("live_answers")
-    .select("id, question_id, player_id, answer_text, answer_path, players(name)")
+    .select(
+      "id, question_id, player_id, answer_text, answer_path, answer_paths, players(name)",
+    )
     .eq("live_event_id", liveEventId)
     .eq("space_id", spaceId);
 
-  const urls = await signPaths(
-    supabase,
-    (answers ?? []).map((a: any) => a.answer_path),
-  );
+  // Gather every photo path across all answers to sign in one round-trip.
+  const allPaths: string[] = [];
+  for (const a of (answers ?? []) as any[]) {
+    if (a.answer_paths?.length) allPaths.push(...a.answer_paths);
+    else if (a.answer_path) allPaths.push(a.answer_path);
+  }
+  const urls = await signPaths(supabase, allPaths);
 
   return (questions ?? []).map((q) => ({
     id: q.id,
@@ -347,13 +383,25 @@ export async function getLiveReveal(
     anonymous: q.anonymous,
     answers: (answers ?? [])
       .filter((a: any) => a.question_id === q.id)
-      .map((a: any) => ({
-        answer_id: a.id,
-        player_id: a.player_id,
-        player_name: a.players?.name ?? "",
-        text: a.answer_text,
-        photo_url: a.answer_path ? urls.get(a.answer_path) ?? null : null,
-      })),
+      .map((a: any) => {
+        // resolve all photo paths for this answer to signed URLs
+        const paths: string[] = a.answer_paths?.length
+          ? a.answer_paths
+          : a.answer_path
+            ? [a.answer_path]
+            : [];
+        const photo_urls = paths
+          .map((p) => urls.get(p) ?? null)
+          .filter((u): u is string => !!u);
+        return {
+          answer_id: a.id,
+          player_id: a.player_id,
+          player_name: a.players?.name ?? "",
+          text: a.answer_text,
+          photo_url: photo_urls[0] ?? null,
+          photo_urls,
+        };
+      }),
   }));
 }
 
@@ -467,8 +515,7 @@ export async function getVoteResults(
     );
   }
 
-  // FIX: this was `new Map` with no type args (syntax error) in your file.
-const byPlayer = new Map<string, { name: string; photo_path: string | null; total: number }>();
+  const byPlayer = new Map<string, { name: string; photo_path: string | null; total: number }>();
   for (const a of (answers ?? []) as any[]) {
     const prev = byPlayer.get(a.player_id) ?? {
       name: a.players?.name ?? "",

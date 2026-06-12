@@ -13,9 +13,9 @@ export default function LiveEventBuilder() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([
-    { prompt: "", answer_type: "text", required: true, anonymous: false },
+    { prompt: "", answer_type: "text", required: true, anonymous: false, photo_count: 1 },
   ]);
-  // Vote point values, typed comma-separated, e.g. "2, 4, 6, 8, 10".
+  const [hasVoting, setHasVoting] = useState(true); // voting on by default
   const [voteValues, setVoteValues] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -25,9 +25,6 @@ export default function LiveEventBuilder() {
       setError("Anna tapahtumalle nimi.");
       return;
     }
-    // Require at least one question with a non-empty prompt. Blank-prompt
-    // questions get filtered out on the server, so without this an event
-    // could be created with zero questions.
     const realQuestions = questions.filter((q) => q.prompt.trim());
     if (realQuestions.length === 0) {
       setError("Lisää vähintään yksi kysymys.");
@@ -37,15 +34,17 @@ export default function LiveEventBuilder() {
     setError(null);
     startTransition(async () => {
       try {
-        // auto-ends any currently-live event
-        const { id } = await createLiveEvent(name, questions);
+        // pass the voting flag; auto-ends any currently-live event
+        const { id } = await createLiveEvent(name, questions, hasVoting);
 
-        // parse "2,4,6" → [2,4,6]; store as this event's vote options
-        const values = voteValues
-          .split(",")
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((n) => Number.isFinite(n));
-        if (values.length) await createVoteOptions(id, values);
+        // only store vote options if voting is on
+        if (hasVoting) {
+          const values = voteValues
+            .split(",")
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => Number.isFinite(n));
+          if (values.length) await createVoteOptions(id, values);
+        }
 
         router.push(`/o/historia/live/${id}`);
       } catch {
@@ -69,21 +68,29 @@ export default function LiveEventBuilder() {
         <LiveQuestionEditor questions={questions} onChange={setQuestions} />
       </div>
 
-      {/* Vote point values for the reveal/voting phase */}
-      <div>
-        <p className="text-sm font-semibold text-ink mb-2">
-          Äänestyspisteet (valinnainen)
-        </p>
+      {/* Voting on/off */}
+      <label className="card flex items-center justify-between">
+        <span className="font-semibold text-ink">Äänestys käytössä</span>
         <input
-          className="input"
-          placeholder="esim. 2, 4, 6, 8, 10"
-          value={voteValues}
-          onChange={(e) => setVoteValues(e.target.value)}
+          type="checkbox"
+          checked={hasVoting}
+          onChange={(e) => setHasVoting(e.target.checked)}
         />
-        <p className="text-xs text-ink/70 mt-1">
-          Pilkulla erotellut arvot. Jätä tyhjäksi jos et halua äänestystä.
-        </p>
-      </div>
+      </label>
+
+      {/* Vote values only matter when voting is on */}
+      {hasVoting && (
+        <div>
+          <p className="text-sm font-semibold text-ink mb-2">Äänestyspisteet</p>
+          <input
+            className="input"
+            placeholder="esim. 2, 4, 6, 8, 10"
+            value={voteValues}
+            onChange={(e) => setVoteValues(e.target.value)}
+          />
+          <p className="text-xs text-ink/70 mt-1">Pilkulla erotellut arvot.</p>
+        </div>
+      )}
 
       <p className="text-sm text-ink/80">
         Tallennus tekee tästä live-tapahtuman ja päättää mahdollisen aiemman

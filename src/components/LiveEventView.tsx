@@ -13,6 +13,7 @@ import VoteResults from "@/components/VoteResults";
 import {
   setLiveEventLive,
   setLiveEventRevealed,
+  setLiveEventResultsRevealed,
   replaceLiveQuestions,
   deleteLiveEvent,
   type LiveEvent,
@@ -30,7 +31,7 @@ interface PendingAction {
 }
 
 interface LiveEventViewProps {
-  detail: LiveEvent & { revealed: boolean };
+  detail: LiveEvent;
   players: Player[];
   answeredIds: string[];
   votedIds: string[];
@@ -64,6 +65,7 @@ export default function LiveEventView({
       answer_type: q.answer_type,
       required: q.required,
       anonymous: q.anonymous,
+      photo_count: q.photo_count ?? undefined,
     })),
   );
 
@@ -71,6 +73,11 @@ export default function LiveEventView({
   const voted = new Set(votedIds);
   const everyoneAnswered =
     players.length > 0 && answeredIds.length >= players.length;
+  const everyoneVoted =
+    players.length > 0 && votedIds.length >= players.length;
+
+  // Voting only matters when the event has it AND answers are revealed.
+  const votingActive = detail.has_voting && detail.revealed;
 
   function confirmRun() {
     if (!pending) return;
@@ -81,16 +88,16 @@ export default function LiveEventView({
     });
   }
 
-  // Build the anonymous votable list from the reveal data (one tile per answer).
+  // Anonymous votable list from the reveal data — uses the REAL answer_id.
   const votable: VotableAnswer[] = (reveal ?? []).flatMap((q) =>
     q.answers.map((a) => ({
-      answer_id: `${q.id}:${a.player_id}`, // placeholder; see note below
+      answer_id: a.answer_id,
       text: a.text,
       photo_url: a.photo_url,
     })),
   );
 
-  // ── Active player is answering (pre-reveal) or voting (post-reveal) ────────
+  // ── Active player is answering (pre-reveal) or voting (reveal + has_voting) ─
   if (activePlayer) {
     if (!detail.revealed) {
       return (
@@ -103,6 +110,7 @@ export default function LiveEventView({
         />
       );
     }
+    // revealed + voting on → vote; (no-voting events never set activePlayer here)
     return (
       <LiveVoting
         liveEventId={detail.id}
@@ -116,10 +124,6 @@ export default function LiveEventView({
 
   return (
     <>
-      <Link href={BACK_HREF} className="btn btn-soft px-3 mb-4 w-fit">
-        <ArrowLeft size={18} />
-        Takaisin
-      </Link>
 
       {/* Title + status + settings */}
       <div className="flex items-start justify-between gap-3 mb-5">
@@ -147,77 +151,104 @@ export default function LiveEventView({
       {/* ── MAIN AREA (when not in settings) ──────────────────────────────── */}
       {!showSettings && (
         <>
-          {/* Results, once revealed and there are votes */}
-          {detail.revealed && voteResults.length > 0 && (
-            <div className="mb-6">
-              <VoteResults results={voteResults} />
-              {/* Kirjaa laji: hand the ranking into the scored-laji form,
-                  prefilled with each player's total vote points (editable). */}
-              <Link
-                href={`/o/kirjaalaji?name=${encodeURIComponent(
-                  detail.name,
-                )}&points=${encodeURIComponent(
-                  JSON.stringify(
-                    Object.fromEntries(
-                      voteResults.map((r) => [r.player_id, r.total]),
-                    ),
-                  ),
-                )}`}
-                className="btn btn-primary w-full mt-4"
-              >
-                <ClipboardList size={18} />
-                Kirjaa laji
-              </Link>
+          {/* RESULTS — only after results_revealed (voting events only) */}
+          {detail.has_voting &&
+            detail.results_revealed &&
+            voteResults.length > 0 && (
+              <div className="mb-6">
+                <VoteResults results={voteResults} />
+              </div>
+            )}
+
+          {/* REVEAL (no voting): just show each question's answers, 2 per row,
+              photo on top, no name. */}
+          {detail.revealed && !detail.has_voting && reveal && (
+            <div className="flex flex-col gap-6 mb-6">
+              {reveal.map((q) => (
+                <div key={q.id}>
+                  <p className="font-semibold text-ink mb-2">{q.prompt}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {q.answers.map((a) => (
+                      <div
+                        key={a.answer_id}
+                        className="card flex flex-col gap-1 overflow-hidden"
+                      >
+                        {a.photo_url ? (
+                          <img
+                            src={a.photo_url}
+                            alt=""
+                            loading="lazy"
+                            className="w-full aspect-square object-cover rounded-lg"
+                          />
+                        ) : (
+                          <p className="text-ink text-sm">{a.text}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Player tiles: tap your photo to answer (pre-reveal) or vote (post) */}
-          <p className="text-ink mb-3">
-            {detail.revealed
-              ? "Napauta kuvaasi äänestääksesi."
-              : "Napauta kuvaasi vastataksesi."}
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            {players.map((p) => {
-              // pre-reveal: done = answered; post-reveal: done = voted
-              const done = detail.revealed ? voted.has(p.id) : answered.has(p.id);
-              return (
-                <button
-                  key={p.id}
-                  disabled={done}
-                  onClick={() => setActivePlayer(p)}
-                  className={`flex flex-col items-center gap-1 ${
-                    done ? "opacity-50" : ""
-                  }`}
-                >
-                  <div
-                    className={`rounded-full ring-2 ${
-                      done
-                        ? detail.revealed
-                          ? "ring-teal-600" // voted
-                          : "ring-wine" // answered
-                        : "ring-transparent"
-                    }`}
-                  >
-                    <PlayerAvatar
-                      name={p.name}
-                      photoUrl={p.photo_url}
-                      seed={p.id}
-                      size={72}
-                    />
-                  </div>
-                  <span className="text-xs font-medium text-ink text-center truncate w-full">
-                    {p.name}
-                  </span>
-                  {done && (
-                    <span className="text-[10px] font-bold text-wine">
-                      {detail.revealed ? "Äänestetty" : "Valmis"}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* PLAYER TILES — answering, or voting (only when voting is active
+              and results aren't revealed yet). Hidden once results are out. */}
+          {!(detail.has_voting && detail.results_revealed) && (
+            <>
+              <p className="text-ink mb-3">
+                {votingActive
+                  ? "Napauta kuvaasi äänestääksesi."
+                  : "Napauta kuvaasi vastataksesi."}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {players.map((p) => {
+                  // before reveal: done = answered.
+                  // voting active: done = voted.
+                  const done = votingActive
+                    ? voted.has(p.id)
+                    : answered.has(p.id);
+                  // no-voting + revealed: nothing left to do — disable taps.
+                  const disabled =
+                    done || (detail.revealed && !detail.has_voting);
+                  return (
+                    <button
+                      key={p.id}
+                      disabled={disabled}
+                      onClick={() => setActivePlayer(p)}
+                      className={`flex flex-col items-center gap-1 ${
+                        disabled ? "opacity-50" : ""
+                      }`}
+                    >
+                      <div
+                        className={`rounded-full ring-2 ${
+                          done
+                            ? votingActive
+                              ? "ring-teal-600" // voted
+                              : "ring-wine" // answered
+                            : "ring-transparent"
+                        }`}
+                      >
+                        <PlayerAvatar
+                          name={p.name}
+                          photoUrl={p.photo_url}
+                          seed={p.id}
+                          size={72}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-ink text-center truncate w-full">
+                        {p.name}
+                      </span>
+                      {done && (
+                        <span className="text-[10px] font-bold text-wine">
+                          {votingActive ? "Äänestetty" : "Valmis"}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -232,7 +263,9 @@ export default function LiveEventView({
               aria-checked={detail.is_live}
               onClick={() =>
                 setPending({
-                  title: detail.is_live ? "Päätä live-tapahtuma?" : "Käynnistä uudelleen?",
+                  title: detail.is_live
+                    ? "Päätä live-tapahtuma?"
+                    : "Käynnistä uudelleen?",
                   message: detail.is_live
                     ? "Tapahtuma siirtyy historiaan päättyneenä."
                     : "Tämä päättää mahdollisen muun live-tapahtuman.",
@@ -251,7 +284,7 @@ export default function LiveEventView({
             </button>
           </div>
 
-          {/* Reveal toggle — only enabled once everyone has answered */}
+          {/* Reveal answers — enabled once everyone has answered */}
           <div className="card flex items-center justify-between">
             <div>
               <span className="font-semibold text-ink">Paljasta vastaukset</span>
@@ -267,7 +300,9 @@ export default function LiveEventView({
               disabled={!everyoneAnswered && !detail.revealed}
               onClick={() =>
                 setPending({
-                  title: detail.revealed ? "Piilota vastaukset?" : "Paljasta vastaukset?",
+                  title: detail.revealed
+                    ? "Piilota vastaukset?"
+                    : "Paljasta vastaukset?",
                   run: () => setLiveEventRevealed(detail.id, !detail.revealed),
                 })
               }
@@ -283,9 +318,72 @@ export default function LiveEventView({
             </button>
           </div>
 
+          {/* Reveal results — voting events only, enabled once everyone voted */}
+          {detail.has_voting && (
+            <div className="card flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-ink">Paljasta tulokset</span>
+                {!everyoneVoted && (
+                  <p className="text-xs text-ink/70">
+                    Kaikkien on ensin äänestettävä.
+                  </p>
+                )}
+              </div>
+              <button
+                role="switch"
+                aria-checked={detail.results_revealed}
+                disabled={!everyoneVoted && !detail.results_revealed}
+                onClick={() =>
+                  setPending({
+                    title: detail.results_revealed
+                      ? "Piilota tulokset?"
+                      : "Paljasta tulokset?",
+                    run: () =>
+                      setLiveEventResultsRevealed(
+                        detail.id,
+                        !detail.results_revealed,
+                      ),
+                  })
+                }
+                className={`w-12 h-7 rounded-full transition-colors relative disabled:opacity-40 ${
+                  detail.results_revealed ? "bg-wine" : "bg-mint-100"
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-5 h-5 rounded-full bg-paper transition-all ${
+                    detail.results_revealed ? "left-6" : "left-1"
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {/* Kirjaa laji — moved here from the results area. Prefills the
+              scored-laji form. With voting: each player's total vote points.
+              Without voting: just the name (points left blank/editable). */}
+          <Link
+            href={`/o/kirjaalaji?name=${encodeURIComponent(detail.name)}${
+              detail.has_voting && voteResults.length > 0
+                ? `&points=${encodeURIComponent(
+                    JSON.stringify(
+                      Object.fromEntries(
+                        voteResults.map((r) => [r.player_id, r.total]),
+                      ),
+                    ),
+                  )}`
+                : ""
+            }`}
+            className="btn btn-primary w-full"
+          >
+            <ClipboardList size={18} />
+            Kirjaa laji
+          </Link>
+
           {/* Edit questions */}
           <div>
-            <p className="text-sm font-semibold text-ink mb-2">Muokkaa kysymyksiä</p>
+            <p className="text-sm font-semibold text-ink mb-2">
+              Muokkaa kysymyksiä
+            </p>
             <LiveQuestionEditor questions={questions} onChange={setQuestions} />
             <button
               className="btn btn-primary w-full mt-3"

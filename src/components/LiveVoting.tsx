@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import PhotoLightbox from "@/components/PhotoLightbox";
 import { submitVotes } from "@/lib/db/liveEvents";
 
 export interface VotableAnswer {
@@ -14,7 +15,7 @@ export interface VotableAnswer {
 interface LiveVotingProps {
   liveEventId: string;
   voterId: string;
-  answers: VotableAnswer[];          // anonymous, already photo-signed
+  answers: VotableAnswer[]; // anonymous, already photo-signed
   options: { id: string; value: number }[];
   onDone: () => void;
 }
@@ -44,12 +45,11 @@ export default function LiveVoting({
   // answer_id → chosen value (as string; "" = none)
   const [ballot, setBallot] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
-  // values already used somewhere in the ballot
-  const usedValues = new Set(
-    Object.values(ballot).filter((v) => v !== ""),
-  );
+  // values already used somewhere in the ballot (each option once)
+  const usedValues = new Set(Object.values(ballot).filter((v) => v !== ""));
 
   function setVote(answerId: string, value: string) {
     setBallot((prev) => ({ ...prev, [answerId]: value }));
@@ -89,7 +89,8 @@ export default function LiveVoting({
                     src={a.photo_url}
                     alt=""
                     loading="lazy"
-                    className="w-full h-24 object-cover rounded-lg"
+                    onClick={() => setLightboxUrl(a.photo_url)}
+                    className="w-full h-24 object-cover rounded-lg cursor-pointer"
                   />
                 ) : (
                   <p className="text-ink truncate">{a.text}</p>
@@ -138,6 +139,14 @@ export default function LiveVoting({
         onConfirm={save}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {/* Tap a photo → open it big */}
+      {lightboxUrl && (
+        <PhotoLightbox
+          photos={[{ url: lightboxUrl, name: "kuva.jpg" }]}
+          onClose={() => setLightboxUrl(null)}
+        />
+      )}
     </div>
   );
 }

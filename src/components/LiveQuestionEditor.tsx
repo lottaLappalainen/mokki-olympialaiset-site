@@ -18,14 +18,19 @@ export default function LiveQuestionEditor({
   questions,
   onChange,
 }: LiveQuestionEditorProps) {
-  // Update one question by index.
   function patch(i: number, fields: Partial<QuestionDraft>) {
     onChange(questions.map((q, idx) => (idx === i ? { ...q, ...fields } : q)));
   }
   function add() {
     onChange([
       ...questions,
-      { prompt: "", answer_type: "text", required: true, anonymous: false },
+      {
+        prompt: "",
+        answer_type: "text",
+        required: true,
+        anonymous: false,
+        photo_count: 1, // default; only used when type === "photo"
+      },
     ]);
   }
   function remove(i: number) {
@@ -53,7 +58,6 @@ export default function LiveQuestionEditor({
             </button>
           </div>
 
-          {/* Answer type */}
           <label className="text-sm font-medium text-ink">
             Vastaustyyppi
             <select
@@ -71,7 +75,25 @@ export default function LiveQuestionEditor({
             </select>
           </label>
 
-          {/* Flags */}
+          {/* Photo count — only for photo questions. "Exactly N photos." */}
+          {q.answer_type === "photo" && (
+            <label className="text-sm font-medium text-ink">
+              Kuvien määrä (tarkalleen)
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                className="input mt-1 w-24"
+                value={q.photo_count ?? 1}
+                onChange={(e) =>
+                  patch(i, {
+                    photo_count: Math.max(1, parseInt(e.target.value, 10) || 1),
+                  })
+                }
+              />
+            </label>
+          )}
+
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
