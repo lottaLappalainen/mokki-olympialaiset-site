@@ -2,34 +2,51 @@
 
 import { useRef, useState, useEffect } from "react";
 import { ImagePlus, X } from "lucide-react";
+import { compressImage } from "@/lib/images/compress";
 
 interface PhotoUploaderProps {
   multiple?: boolean;
   label?: string;
   onFilesChange: (files: File[]) => void;
+  resetKey?: number; // bump this from the parent to clear the picker after save
 }
 
 export default function PhotoUploader({
   multiple = false,
   label = "Lisää kuva",
   onFilesChange,
+  resetKey = 0,
 }: PhotoUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
 
+  // Build/revoke object-URL previews (no leaks).
   useEffect(() => {
     const urls = files.map((f) => URL.createObjectURL(f));
     setPreviews(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [files]);
 
-  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  // When the parent bumps resetKey (i.e. after a successful save), clear
+  // the picked files + previews so they don't linger as duplicates.
+  useEffect(() => {
+    if (resetKey > 0) setFiles([]);
+  }, [resetKey]);
+
+  async function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
-    const next = multiple ? [...files, ...picked] : picked.slice(0, 1);
+    e.target.value = "";
+    if (picked.length === 0) return;
+
+    setBusy(true);
+    const compressed = await Promise.all(picked.map((f) => compressImage(f)));
+    setBusy(false);
+
+    const next = multiple ? [...files, ...compressed] : compressed.slice(0, 1);
     setFiles(next);
     onFilesChange(next);
-    e.target.value = "";
   }
 
   function remove(index: number) {
@@ -47,6 +64,8 @@ export default function PhotoUploader({
               <img
                 src={src}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="w-20 h-20 rounded-xl object-cover bg-surface"
               />
               <button
@@ -66,9 +85,10 @@ export default function PhotoUploader({
         type="button"
         className="btn btn-soft"
         onClick={() => inputRef.current?.click()}
+        disabled={busy}
       >
         <ImagePlus size={18} />
-        {label}
+        {busy ? "Pakataan…" : label}
       </button>
       <input
         ref={inputRef}

@@ -11,11 +11,10 @@ function extOf(filename: string): string {
 }
 
 // Upload a file under "{spaceId}/{folder}/{uuid}.{ext}" and return its path.
-// The storage RLS insert policy verifies the first path segment == space.
 export async function uploadImage(
   supabase: SupabaseClient,
   spaceId: string,
-  folder: "players" | "eventt",
+  folder: "players" | "events" | "space" | "live", // ← widened
   file: File,
 ): Promise<string> {
   const path = `${spaceId}/${folder}/${randomUUID()}.${extOf(file.name)}`;
@@ -40,7 +39,6 @@ export async function deleteImages(
 }
 
 // Sign many paths in a single round-trip → Map of path → signed URL.
-// (Private bucket, so a path is useless without a signature.)
 export async function signPaths(
   supabase: SupabaseClient,
   paths: (string | null | undefined)[],

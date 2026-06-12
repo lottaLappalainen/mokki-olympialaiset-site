@@ -34,13 +34,23 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
     <>
       {/* Code */}
       <div className="card-accent text-center mb-6">
-        <p className="text-sm font-semibold text-wine mb-2">Olympialaisten koodi</p>
-        <button
-          onClick={copyCode}
-          className="block w-full font-mono font-bold tracking-[0.15em] text-ink text-4xl break-all"
-        >
-          {code}
-        </button>
+          {/* Code banner: animated wine→plum→teal gradient */}
+          <div
+            className="rounded-2xl p-5 mb-6 text-center text-paper
+                      bg-gradient-to-r from-wine via-plum to-teal-600
+                      bg-[length:200%_200%] animate-[gradientShift_6s_ease-in-out_infinite]"
+          >
+            <p className="text-sm font-semibold mb-2 opacity-90">Olympialaisten koodi</p>
+            <button
+              onClick={copyCode}
+              className="block w-full font-mono font-bold tracking-[0.15em] text-4xl break-all"
+            >
+              {code}
+            </button>
+            <p className="text-sm mt-3 opacity-90">
+              {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
+            </p>
+          </div>
         <p className="text-sm text-teal-600 mt-3 flex items-center justify-center gap-1.5">
           {copied ? <Check size={15} /> : <Copy size={15} />}
           {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}

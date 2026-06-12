@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Images } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { listevents } from "@/lib/db/events";
 
@@ -8,7 +8,14 @@ export default async function historyPage() {
 
   return (
     <>
-      <PageHeader title="Historia" subtitle={`${events.length} lajit`} />
+      <PageHeader
+        title="Historia"
+        right={
+          <Link href="/o/historia/galleria" aria-label="Galleria" className="btn btn-soft px-3">
+            <Images size={18} />
+          </Link>
+        }
+      />
 
       {events.length === 0 ? (
         <div className="card text-center text-teal-600">

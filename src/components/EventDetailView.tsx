@@ -2,12 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Pencil, Trash2, Check, X } from "lucide-react";
 import PlayerAvatar from "@/components/PlayerAvatar";
-import PhotoGallery from "@/components/PhotoGallery";
+import PhotoCarousel from "@/components/PhotoCarousel"; // was PhotoGallery
 import PhotoUploader from "@/components/PhotoUploader";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { updateevent, deleteevent, addeventPhoto, deleteeventPhoto } from "@/lib/db/events";
+import {
+  updateevent,
+  deleteevent,
+  addeventPhoto,
+  deleteeventPhoto,
+} from "@/lib/db/events";
 import { setScore } from "@/lib/db/scores";
 import type { eventDetail } from "@/lib/db/reads";
 
@@ -18,7 +24,9 @@ interface PendingAction {
   run: () => Promise<void>;
 }
 
-export default function eventDetailView({ detail }: { detail: eventDetail }) {
+const BACK_HREF = "/o/historia";
+
+export default function EventDetailView({ detail }: { detail: eventDetail }) {
   const router = useRouter();
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, startTransition] = useTransition();
@@ -26,6 +34,8 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(detail.name);
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
+  // clears the uploader previews after save (no duplicates)
+  const [photoResetKey, setPhotoResetKey] = useState(0);
   const [pointsEdit, setPointsEdit] = useState<Record<string, string>>(
     Object.fromEntries(
       detail.results.map((r) => [r.player_id, r.points?.toString() ?? ""]),
@@ -43,10 +53,19 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
 
   return (
     <>
+      <Link
+        href={BACK_HREF}
+        aria-label="Takaisin historiaan"
+        className="btn btn-soft px-3 mb-4 w-fit"
+      >
+        <ArrowLeft size={18} />
+        Takaisin
+      </Link>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-wine">event {detail.ordinal}</p>
+          <p className="text-sm font-semibold text-wine">Laji {detail.ordinal}</p>
           {editingName ? (
             <div className="flex items-center gap-2 mt-1">
               <input
@@ -61,7 +80,7 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
                 onClick={() =>
                   setPending({
                     title: "Tallenna muutos?",
-                    message: `eventn nimeksi tulee "${name.trim()}".`,
+                    message: `Lajin nimeksi tulee "${name.trim()}".`,
                     run: async () => {
                       await updateevent(detail.id, { name });
                       setEditingName(false);
@@ -92,23 +111,23 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
         {!editingName && (
           <div className="flex gap-2 shrink-0">
             <button
-              aria-label="Muokkaa eventa"
+              aria-label="Muokkaa lajia"
               className="btn btn-outline px-3"
               onClick={() => setEditingName(true)}
             >
               <Pencil size={18} />
             </button>
             <button
-              aria-label="Poista event"
+              aria-label="Poista laji"
               className="btn btn-accent px-3"
               onClick={() =>
                 setPending({
-                  title: "Poista event?",
-                  message: "Tämä poistaa eventn, sen kuvat ja kaikki pisteet.",
+                  title: "Poista laji?",
+                  message: "Tämä poistaa lajin, sen kuvat ja kaikki pisteet.",
                   destructive: true,
                   run: async () => {
                     await deleteevent(detail.id);
-                    router.push("/o/historia");
+                    router.push(BACK_HREF);
                   },
                 })
               }
@@ -119,9 +138,9 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
         )}
       </div>
 
-      {/* Photos */}
+      {/* Photos — now a swipeable carousel WITH per-photo delete */}
       <div className="mb-5 flex flex-col gap-3">
-        <PhotoGallery
+        <PhotoCarousel
           photos={detail.photos}
           onRequestDelete={(photoId) =>
             setPending({
@@ -131,7 +150,12 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
             })
           }
         />
-        <PhotoUploader multiple label="Lisää kuvia" onFilesChange={setNewPhotos} />
+        <PhotoUploader
+          multiple
+          label="Lisää kuvia"
+          onFilesChange={setNewPhotos}
+          resetKey={photoResetKey}
+        />
         {newPhotos.length > 0 && (
           <button
             className="btn btn-primary"
@@ -144,6 +168,7 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
                   await addeventPhoto(detail.id, fd);
                 }
                 setNewPhotos([]);
+                setPhotoResetKey((k) => k + 1);
                 router.refresh();
               })
             }
@@ -161,10 +186,23 @@ export default function eventDetailView({ detail }: { detail: eventDetail }) {
             <div className="w-7 text-center font-bold text-wine shrink-0">
               {r.placement ?? "–"}
             </div>
-            <PlayerAvatar name={r.name} photoUrl={r.photo_url} size={40} />
-            <span className="flex-1 min-w-0 font-semibold text-ink truncate">
-              {r.name}
-            </span>
+
+            <Link
+              href={`/o/pelaajat/${r.player_id}`}
+              className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1 -mx-1
+                         transition-colors hover:bg-mint-100 active:bg-teal-400"
+            >
+              <PlayerAvatar
+                name={r.name}
+                photoUrl={r.photo_url}
+                seed={r.player_id}
+                size={40}
+              />
+              <span className="min-w-0 font-semibold text-ink truncate">
+                {r.name}
+              </span>
+            </Link>
+
             <input
               type="number"
               inputMode="numeric"

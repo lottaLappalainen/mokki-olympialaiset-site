@@ -1,42 +1,75 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PlayerAvatar from "@/components/PlayerAvatar";
 import PhotoUploader from "@/components/PhotoUploader";
+import PointSelect from "@/components/PointSelect";
 import { createevent, addeventPhoto } from "@/lib/db/events";
 import { setScores } from "@/lib/db/scores";
 import type { Player } from "@/lib/db/types";
+import type { PointOption } from "@/lib/db/settings";
 
 type Step = "name" | "details" | "scoring";
 
 interface LokiFlowProps {
   players: Player[];
   nextNumber: number;
+  pointOptions: PointOption[]; // when non-empty, scoring uses a dropdown
 }
 
-export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
+export default function LokiFlow({
+  players,
+  nextNumber,
+  pointOptions,
+}: LokiFlowProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
-  const [eventId, seteventId] = useState<string | null>(null);
+  const [eventId, setEventId] = useState<string | null>(null);
   const [points, setPoints] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // ── Prefill from a "Kirjaa laji" handoff (e.g. from an ended live event) ──
+  // URL shape: /o/kirjaalaji?name=Tietovisa&points={"<playerId>":12,...}
+  // Prefills the name and each player's points; everything stays editable.
+  useEffect(() => {
+    const prefName = searchParams.get("name");
+    const prefPoints = searchParams.get("points");
+    if (prefName) setName(prefName);
+    if (prefPoints) {
+      try {
+        const parsed = JSON.parse(prefPoints) as Record<string, number>;
+        // store as strings, since the inputs are text
+        const asStrings: Record<string, string> = {};
+        for (const [pid, val] of Object.entries(parsed)) {
+          asStrings[pid] = String(val);
+        }
+        setPoints(asStrings);
+      } catch {
+        // bad/garbled param → ignore, just don't prefill points
+      }
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Step 1 → 2
   function goToDetails() {
     if (!name.trim()) {
-      setError("Anna eventlle nimi.");
+      setError("Anna lajille nimi.");
       return;
     }
     setError(null);
     setStep("details");
   }
 
-  // Step 2 → save event + photos → 3
-  function saveevent() {
+  // Step 2 → save laji + photos → 3
+  function saveEvent() {
     setError(null);
     startTransition(async () => {
       try {
@@ -46,10 +79,10 @@ export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
           fd.append("photo", file);
           await addeventPhoto(id, fd);
         }
-        seteventId(id);
+        setEventId(id);
         setStep("scoring");
       } catch {
-        setError("eventn tallennus epäonnistui.");
+        setError("Lajin tallennus epäonnistui.");
       }
     });
   }
@@ -75,10 +108,11 @@ export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
   if (step === "name") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm font-semibold text-wine">event {nextNumber}</p>
+        {/* "event N" → "Laji N" */}
+        <p className="text-sm font-semibold text-wine">Laji {nextNumber}</p>
         <input
           className="input text-lg"
-          placeholder="eventn nimi (esim. Mölkky)"
+          placeholder="Lajin nimi (esim. Mölkky)"
           value={name}
           autoFocus
           onChange={(e) => setName(e.target.value)}
@@ -96,7 +130,7 @@ export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
     return (
       <div className="flex flex-col gap-5">
         <div>
-          <p className="text-sm font-semibold text-wine">event {nextNumber}</p>
+          <p className="text-sm font-semibold text-wine">Laji {nextNumber}</p>
           <input
             className="input text-xl font-bold mt-2"
             value={name}
@@ -111,10 +145,10 @@ export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
 
         <button
           className="btn btn-primary"
-          onClick={saveevent}
+          onClick={saveEvent}
           disabled={isPending}
         >
-          {isPending ? "Tallennetaan…" : "Tallenna event"}
+          {isPending ? "Tallennetaan…" : "Tallenna laji"}
         </button>
         {error && <p className="text-wine font-medium">{error}</p>}
       </div>
@@ -125,32 +159,37 @@ export default function LokiFlow({ players, nextNumber }: LokiFlowProps) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm font-semibold text-wine">
-        event {nextNumber} · {name}
+        Laji {nextNumber} · {name}
       </p>
       <p className="text-ink font-semibold">Syötä pisteet</p>
 
       {players.length === 0 && (
-        <p className="text-teal-600">
-          Ei pelaajia. Lisää pelaajia profiilista ensin.
+        // on-background text → ink, not the blue teal-600
+        <p className="text-ink">
+          Ei pelaajia. Lisää pelaajia Pelaajat-sivulta ensin.
         </p>
       )}
 
       <div className="flex flex-col gap-2">
         {players.map((p) => (
           <div key={p.id} className="card flex items-center gap-3 py-3">
-            <PlayerAvatar name={p.name} photoUrl={p.photo_url} size={40} />
+            <PlayerAvatar
+              name={p.name}
+              photoUrl={p.photo_url}
+              seed={p.id}
+              size={40}
+            />
             <span className="flex-1 min-w-0 font-semibold text-ink truncate">
               {p.name}
             </span>
-            <input
-              type="number"
-              inputMode="numeric"
-              className="input w-20 text-center"
-              placeholder="0"
+            {/* dropdown when point options are configured, else free number */}
+            <PointSelect
+              options={pointOptions}
               value={points[p.id] ?? ""}
-              onChange={(e) =>
-                setPoints((prev) => ({ ...prev, [p.id]: e.target.value }))
+              onChange={(v) =>
+                setPoints((prev) => ({ ...prev, [p.id]: v }))
               }
+              className="w-24"
             />
           </div>
         ))}

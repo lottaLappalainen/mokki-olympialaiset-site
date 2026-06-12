@@ -1,31 +1,33 @@
 import PageHeader from "@/components/PageHeader";
 import LeaderboardList from "@/components/LeaderboardList";
 import PhotoCarousel from "@/components/PhotoCarousel";
+import LiveEventBanner from "@/components/LiveEventBanner";
 import { getLeaderboard } from "@/lib/db/reads";
 import { listSpacePhotos, getSpaceHeader } from "@/lib/db/settings";
+import { getLiveEvent } from "@/lib/db/liveEvents";
 
 export default async function LeaderboardPage() {
-  // Standings, space photos, and the header text — all at once.
-  const [rows, photos, header] = await Promise.all([
+  const [rows, photos, header, live] = await Promise.all([
     getLeaderboard(),
     listSpacePhotos(),
     getSpaceHeader(),
+    getLiveEvent(), // the single live event, or null
   ]);
 
   return (
     <>
-      {/* Carousel at the very top (renders nothing if no photos). Tap a photo
-          to open it fullscreen. */}
-      <PhotoCarousel photos={photos} />
+      {/* If a live event is running, show the shining banner INSTEAD of the
+          carousel. Otherwise the carousel (which renders nothing if empty). */}
+      {live ? (
+        <LiveEventBanner live={live} />
+      ) : (
+        <PhotoCarousel photos={photos} />
+      )}
 
-      {/* Big olympics header below the carousel. Falls back to a default if
-          the name hasn't been set in Asetukset yet. */}
       <h1 className="text-3xl font-extrabold text-ink text-center mb-1">
         {header || "Olympialaiset"}
       </h1>
-      {/* Section label for the standings (no subtitle prop) */}
       <PageHeader title="Pistetilanne" />
-
       <LeaderboardList rows={rows} />
     </>
   );

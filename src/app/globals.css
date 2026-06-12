@@ -96,3 +96,17 @@
   0%   { transform: translateX(-100%); }
   60%, 100% { transform: translateX(200%); } /* sweep, then long pause */
 }
+
+/* Live-event banner glow: a slow wine→plum shadow pulse. */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(112, 61, 87, 0); }
+  50%      { box-shadow: 0 0 22px 4px rgba(112, 61, 87, 0.6); }
+}
+
+/* Slow animated gradient for the code banner. */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+

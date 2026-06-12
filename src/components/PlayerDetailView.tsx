@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import PlayerAvatar from "@/components/PlayerAvatar";
 import PlayerForm from "@/components/PlayerForm";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -15,6 +16,10 @@ interface PendingAction {
   destructive?: boolean;
   run: () => Promise<void>;
 }
+
+// NOTE: this list of players lives at /o/pelaajat in your nav. If your actual
+// players-list route differs, change BACK_HREF (and the delete redirect below).
+const BACK_HREF = "/o/pelaajat";
 
 export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
   const router = useRouter();
@@ -72,9 +77,27 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
 
   return (
     <>
+      {/* Top-left back button → players list */}
+      <Link
+        href={BACK_HREF}
+        aria-label="Takaisin pelaajiin"
+        className="btn btn-soft px-3 mb-4 w-fit"
+      >
+        <ArrowLeft size={18} />
+        Takaisin
+      </Link>
+
       <div className="flex flex-col items-center gap-3 mb-6">
-        <PlayerAvatar name={detail.name} photoUrl={detail.photo_url} size={112} />
+        {/* seed={detail.id} keeps a photo-less circle's color stable per player */}
+        <PlayerAvatar
+          name={detail.name}
+          photoUrl={detail.photo_url}
+          seed={detail.id}
+          size={112}
+        />
         <h1 className="text-2xl font-bold text-ink text-center">{detail.name}</h1>
+        {/* text-teal-600 sits inside this on-bg block; switch to text-ink if you
+            want it black like the other on-background text */}
         <p className="text-teal-600 font-semibold">
           Yhteensä {detail.total} pistettä
         </p>
@@ -92,7 +115,7 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
                 destructive: true,
                 run: async () => {
                   await deletePlayer(detail.id);
-                  router.push("/o/profiili");
+                  router.push(BACK_HREF);
                 },
               })
             }
@@ -104,13 +127,18 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
 
       <h2 className="font-bold text-ink mb-2">Pisteet lajeittain</h2>
       {detail.scores.length === 0 ? (
-        <p className="text-teal-600">Ei vielä pisteitä.</p>
+        <p className="text-ink">Ei vielä pisteitä.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {detail.scores.map((s) => (
-            <div key={s.event_id} className="card flex items-center gap-3 py-3">
+            // Each event row is now a link to that event's detail page.
+            <Link
+              key={s.event_id}
+              href={`/o/historia/${s.event_id}`}
+              className="card flex items-center gap-3 py-3"
+            >
               <div className="text-xs font-semibold text-wine shrink-0">
-                event {s.ordinal}
+                Laji {s.ordinal}
               </div>
               <span className="flex-1 min-w-0 font-semibold text-ink truncate">
                 {s.name}
@@ -118,7 +146,7 @@ export default function PlayerDetailView({ detail }: { detail: PlayerDetail }) {
               <span className="text-lg font-bold text-teal-600 shrink-0">
                 {s.points}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       )}

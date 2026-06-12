@@ -6,10 +6,11 @@ import { uploadImage, deleteImages, signPaths } from "@/lib/storage/images";
 import type { Player } from "./types";
 
 export async function listPlayers(): Promise<Player[]> {
-  const { supabase } = await requireSpace();
+  const { supabase, spaceId } = await requireSpace();
   const { data, error } = await supabase
     .from("players")
     .select("id, name, photo_path")
+    .eq("space_id", spaceId) // ← scope to THIS olympialaiset
     .order("name");
   if (error) throw new Error(error.message);
 
@@ -43,11 +44,12 @@ export async function createPlayer(formData: FormData): Promise<void> {
 }
 
 export async function updatePlayer(id: string, name: string): Promise<void> {
-  const { supabase } = await requireSpace();
+  const { supabase, spaceId } = await requireSpace();
   const { error } = await supabase
     .from("players")
     .update({ name: name.trim() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("space_id", spaceId); // ← can't edit another space's player
   if (error) throw new Error(error.message);
   revalidatePath("/o");
 }
@@ -67,13 +69,15 @@ export async function setPlayerPhoto(
     .from("players")
     .select("photo_path")
     .eq("id", id)
+    .eq("space_id", spaceId) // ← scope guard
     .maybeSingle();
 
   const newPath = await uploadImage(supabase, spaceId, "players", file);
   const { error } = await supabase
     .from("players")
     .update({ photo_path: newPath })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("space_id", spaceId); // ← scope guard
   if (error) throw new Error(error.message);
 
   if (existing?.photo_path) await deleteImages(supabase, [existing.photo_path]);
@@ -81,15 +85,20 @@ export async function setPlayerPhoto(
 }
 
 export async function deletePlayer(id: string): Promise<void> {
-  const { supabase } = await requireSpace();
+  const { supabase, spaceId } = await requireSpace();
   // Grab the photo path before deleting — cascade removes rows, not files.
   const { data: existing } = await supabase
     .from("players")
     .select("photo_path")
     .eq("id", id)
+    .eq("space_id", spaceId) // ← scope guard
     .maybeSingle();
 
-  const { error } = await supabase.from("players").delete().eq("id", id);
+  const { error } = await supabase
+    .from("players")
+    .delete()
+    .eq("id", id)
+    .eq("space_id", spaceId); // ← can't delete another space's player
   if (error) throw new Error(error.message);
 
   if (existing?.photo_path) await deleteImages(supabase, [existing.photo_path]);

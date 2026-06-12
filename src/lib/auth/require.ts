@@ -1,16 +1,12 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { getSession } from "./session";
-import { scopedClient } from "@/lib/supabase/scoped";
+import { adminClient } from "@/lib/supabase/admin";
 
-// Every database action starts here: turn the session cookie into an
-// RLS-scoped Supabase client plus the current space id. No session → bounce
-// to the landing (middleware already guards /o, this is belt-and-braces).
+// IMPORTANT: this client bypasses RLS. Every query you run with it MUST
+// include .eq("space_id", spaceId) on reads, and set space_id on writes.
 export async function requireSpace() {
   const session = await getSession();
   if (!session) redirect("/");
-  return {
-    supabase: scopedClient(session.token),
-    spaceId: session.spaceId,
-  };
+  return { supabase: adminClient(), spaceId: session.spaceId };
 }
