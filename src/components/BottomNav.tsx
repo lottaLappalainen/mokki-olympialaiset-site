@@ -11,22 +11,21 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-// Left pair: Lajit, Galleria.
+// Left pair: Asetukset, Galleria.
 const left: NavItem[] = [
-  { href: "/o/historia", label: "Lajit", icon: ListChecks },
+  { href: "/o/asetukset", label: "Asetukset", icon: Settings },
   { href: "/o/historia/galleria", label: "Galleria", icon: Images },
 ];
 
-// Right pair: Pelaajat, Asetukset.
+// Right pair: Pelaajat, Lajit.
 const right: NavItem[] = [
+  { href: "/o/historia", label: "Lajit", icon: ListChecks },
   { href: "/o/pelaajat", label: "Pelaajat", icon: User },
-  { href: "/o/asetukset", label: "Asetukset", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/o") return pathname === "/o";
-  // Galleria is nested under /o/historia, so match it exactly and make sure
-  // "Lajit" (/o/historia) doesn't also light up when on the gallery page.
+  // "Lajit" (/o/historia) must NOT light up while on the gallery page.
   if (href === "/o/historia") {
     return (
       pathname === "/o/historia" ||
@@ -62,7 +61,7 @@ export default function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="relative max-w-md mx-auto flex items-center justify-between px-3 h-16">
-        {/* Left pair: Lajit, Galleria */}
+        {/* Left pair: Asetukset, Galleria */}
         <div className="flex gap-1">
           {left.map((item) => (
             <NavButton
@@ -73,10 +72,10 @@ export default function BottomNav() {
           ))}
         </div>
 
-        {/* Center: Tulostaulukko (leaderboard / home), raised */}
+        {/* Center: Pisteet (leaderboard / home), raised */}
         <Link
           href="/o"
-          aria-label="Tulostaulukko"
+          aria-label="Pisteet"
           className={`absolute left-1/2 -translate-x-1/2 -top-5 w-16 h-16 rounded-full flex items-center justify-center border-4 border-paper ${
             homeActive ? "bg-wine text-paper" : "bg-teal-400 text-ink"
           }`}
@@ -84,7 +83,7 @@ export default function BottomNav() {
           <Trophy size={24} />
         </Link>
 
-        {/* Right pair: Pelaajat, Asetukset */}
+        {/* Right pair: Pelaajat, Lajit */}
         <div className="flex gap-1">
           {right.map((item) => (
             <NavButton
