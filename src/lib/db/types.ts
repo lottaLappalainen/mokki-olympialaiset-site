@@ -1,5 +1,5 @@
 // Shared shapes returned by the database actions.
-// `*_url` fields are signed Storage URLs attached at read time (not columns).
+// `*_url` fields are signed/public Storage URLs attached at read time (not columns).
 
 import { AnswerType } from "./liveEvents";
 
@@ -22,6 +22,8 @@ export interface event {
   ordinal: number;
   name: string;
   photos: eventPhoto[];
+  cover_photo_id: string | null; // chosen cover photo (null = use first photo)
+  cover_url: string | null;      // resolved cover image URL (cover, else first)
 }
 
 export interface LeaderboardRow {
@@ -37,11 +39,10 @@ export interface eventResultRow {
   name: string;
   photo_path: string | null;
   photo_url: string | null;
-  points: number | null;     // null = no score entered yet
-  placement: number | null;  // null = unscored
+  points: number | null; // null = no score entered yet
+  placement: number | null; // null = unscored
 }
 
-// types — add photo_count to both question shapes, has_voting to the event:
 export interface LiveQuestion {
   id: string;
   prompt: string;
@@ -58,6 +59,7 @@ export interface LiveEvent {
   is_live: boolean;
   revealed: boolean;
   has_voting: boolean;
+  results_revealed: boolean;
   questions: LiveQuestion[];
 }
 

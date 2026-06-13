@@ -8,6 +8,7 @@ import PlayerAvatar from "@/components/PlayerAvatar";
 import PhotoCarousel from "@/components/PhotoCarousel";
 import PhotoUploader from "@/components/PhotoUploader";
 import PointSelect from "@/components/PointSelect";
+import PhotoLightbox from "@/components/PhotoLightbox";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   updateevent,
@@ -16,7 +17,11 @@ import {
   deleteeventPhoto,
 } from "@/lib/db/events";
 import { setScore } from "@/lib/db/scores";
-import { upsertEventStat, deleteEventStat, type PlayerStat } from "@/lib/db/eventStats";
+import {
+  upsertEventStat,
+  deleteEventStat,
+  type PlayerStat,
+} from "@/lib/db/eventStats";
 import type { eventDetail } from "@/lib/db/reads";
 import type { PointOption } from "@/lib/db/settings";
 
@@ -54,7 +59,13 @@ export default function EventDetailView({
     ),
   );
 
-  // Stats editing: which player's stat is open, plus its draft fields.
+  // Lightbox for stat photos (opens the tapped thumbnail full-size).
+  const [statLightbox, setStatLightbox] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
+
+  // Stats editing
   const statByPlayer = new Map(stats.map((s) => [s.player_id, s]));
   const [editStatId, setEditStatId] = useState<string | null>(null);
   const [statNote, setStatNote] = useState("");
@@ -177,7 +188,7 @@ export default function EventDetailView({
         )}
       </div>
 
-      {/* Laji photos */}
+      {/* Laji photos — carousel with per-photo delete */}
       <div className="mb-5 flex flex-col gap-3">
         <PhotoCarousel
           photos={detail.photos}
@@ -217,7 +228,7 @@ export default function EventDetailView({
         )}
       </div>
 
-      {/* Results — now uses PointSelect so configured options appear */}
+      {/* Results — PointSelect so configured options appear */}
       <p className="text-ink font-semibold mb-2">Tulokset</p>
       <div className="flex flex-col gap-2 mb-6">
         {detail.results.map((r) => (
@@ -225,7 +236,6 @@ export default function EventDetailView({
             <div className="w-7 text-center font-bold text-wine shrink-0">
               {r.placement ?? "–"}
             </div>
-
             <Link
               href={`/o/pelaajat/${r.player_id}`}
               className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1 -mx-1
@@ -241,8 +251,6 @@ export default function EventDetailView({
                 {r.name}
               </span>
             </Link>
-
-            {/* dropdown when options configured, else free number */}
             <PointSelect
               options={pointOptions}
               value={pointsEdit[r.player_id] ?? ""}
@@ -273,7 +281,7 @@ export default function EventDetailView({
         ))}
       </div>
 
-      {/* Pelikohtaiset stätsit — per-player note + photo, editable/deletable */}
+      {/* Pelikohtaiset stätsit — photos are small thumbnails, tap to open */}
       <p className="text-ink font-semibold mb-2">Pelikohtaiset stätsit</p>
       <div className="flex flex-col gap-2">
         {detail.results.map((r) => {
@@ -349,14 +357,20 @@ export default function EventDetailView({
                   </div>
                 </>
               ) : (
-                // read-only view of the existing stat (or a hint if none)
                 <>
+                  {/* small 80×80 thumbnail; tap opens it full-size */}
                   {s?.photo_url && (
                     <img
                       src={s.photo_url}
                       alt=""
                       loading="lazy"
-                      className="w-full max-h-48 object-cover rounded-lg"
+                      onClick={() =>
+                        setStatLightbox({
+                          url: s.photo_url!,
+                          name: `${r.name}.jpg`,
+                        })
+                      }
+                      className="w-20 h-20 object-cover rounded-lg cursor-pointer"
                     />
                   )}
                   {s?.note ? (
@@ -382,6 +396,14 @@ export default function EventDetailView({
         onConfirm={confirmRun}
         onCancel={() => setPending(null)}
       />
+
+      {/* Stat-photo lightbox (full-size view + download) */}
+      {statLightbox && (
+        <PhotoLightbox
+          photos={[{ url: statLightbox.url, name: statLightbox.name }]}
+          onClose={() => setStatLightbox(null)}
+        />
+      )}
     </>
   );
 }

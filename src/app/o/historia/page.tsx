@@ -15,7 +15,6 @@ export default async function LajitPage() {
 
   return (
     <>
-      {/* "Uusi laji" lives in the header's right slot now (gallery icon gone) */}
       <PageHeader
         title="Lajit"
         right={
@@ -32,18 +31,19 @@ export default async function LajitPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {/* Scored events */}
           {events.map((event) => {
             const color = colorFromSeed(event.id);
+            // cover_url = chosen cover, else first photo (wired in listevents)
+            const cover = event.cover_url ?? event.photos[0]?.url ?? null;
             return (
               <Link
                 key={event.id}
                 href={`/o/historia/${event.id}`}
                 className="card card-link flex items-center gap-3 py-3"
               >
-                {event.photos[0]?.url ? (
+                {cover ? (
                   <img
-                    src={event.photos[0].url}
+                    src={cover}
                     alt=""
                     loading="lazy"
                     decoding="async"
@@ -61,16 +61,13 @@ export default async function LajitPage() {
                   <p className="text-xs font-semibold text-wine">
                     Laji {event.ordinal}
                   </p>
-                  <p className="font-semibold text-ink truncate">
-                    {event.name}
-                  </p>
+                  <p className="font-semibold text-ink truncate">{event.name}</p>
                 </div>
                 <ChevronRight size={20} className="text-wine shrink-0" />
               </Link>
             );
           })}
 
-          {/* Ended live events — dark cards, no number */}
           {endedLive.map((live) => (
             <Link
               key={live.id}
