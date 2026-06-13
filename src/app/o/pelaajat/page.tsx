@@ -7,5 +7,6 @@ export default async function PelaajatPage() {
   const [space, players] = await Promise.all([getSpaceInfo(), listPlayers()]);
   if (!space) redirect("/");
 
-  return <ProfileView players={players} />;
+  // space.name is the olympics header set in Asetukset (may be empty)
+  return <ProfileView header={space.name ?? ""} players={players} />;
 }

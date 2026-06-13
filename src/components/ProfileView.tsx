@@ -12,17 +12,21 @@ import { leaveSpace } from "@/lib/auth/actions";
 import type { Player } from "@/lib/db/types";
 
 interface ProfileViewProps {
+  header: string; // olympics name from settings (spaces.name)
   players: Player[];
 }
 
-export default function ProfileView({ players }: ProfileViewProps) {
+export default function ProfileView({ header, players }: ProfileViewProps) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+
+  // Title: "<header> pelaajat", or just "Pelaajat" if no header set yet.
+  const title = header.trim() ? `${header.trim()} pelaajat` : "Pelaajat";
 
   return (
     <>
       <PageHeader
-        title="Pelaajat"
+        title={title}
         right={
           <button
             className="btn btn-primary px-3 py-1.5 text-sm"
@@ -58,8 +62,8 @@ export default function ProfileView({ players }: ProfileViewProps) {
         </div>
       )}
 
-      {/* Logout stays here on Pelaajat */}
-      <form action={leaveSpace} className="mt-4">
+      {/* Logout — pushed to the bottom of the page */}
+      <form action={leaveSpace} className="mt-auto pt-8">
         <button type="submit" className="btn btn-outline w-full">
           <LogOut size={18} />
           Kirjaudu ulos

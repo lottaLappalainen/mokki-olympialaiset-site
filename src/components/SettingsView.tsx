@@ -10,7 +10,6 @@ import {
   deletePointOption,
   updateSpaceHeader,
   type PointOption,
-  type SpacePhoto,
 } from "@/lib/db/settings";
 
 interface PendingAction {
@@ -21,14 +20,14 @@ interface PendingAction {
 }
 
 interface SettingsViewProps {
+  code: string;
   options: PointOption[];
-  photos: SpacePhoto[];
   header: string;
 }
 
 export default function SettingsView({
+  code,
   options,
-  photos,
   header: initialHeader,
 }: SettingsViewProps) {
   const router = useRouter();
@@ -36,6 +35,7 @@ export default function SettingsView({
   const [busy, startTransition] = useTransition();
 
   const [header, setHeader] = useState(initialHeader);
+  const [copied, setCopied] = useState(false);
   const [newValue, setNewValue] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -58,8 +58,38 @@ export default function SettingsView({
     setEditLabel(o.label ?? "");
   }
 
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* code is visible to copy by hand */
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
+      {/* ── Game code (gradient banner) ──────────────────────────────────── */}
+      <div
+        className="rounded-2xl p-5 text-center text-paper
+                   bg-gradient-to-r from-wine via-plum to-teal-600
+                   bg-[length:200%_200%] animate-[gradientShift_6s_ease-in-out_infinite]"
+      >
+        <p className="text-sm font-semibold mb-2 opacity-90">
+          Olympialaisten koodi
+        </p>
+        <button
+          onClick={copyCode}
+          className="block w-full font-mono font-bold tracking-[0.15em] text-4xl break-all"
+        >
+          {code}
+        </button>
+        <p className="text-sm mt-3 opacity-90">
+          {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
+        </p>
+      </div>
+
       {/* ── Olympics header ───────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <h2 className="font-bold text-ink">Olympialaisten otsikko</h2>
