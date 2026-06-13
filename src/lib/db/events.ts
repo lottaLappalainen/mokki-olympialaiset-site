@@ -8,10 +8,10 @@ import type { event, eventPhoto } from "./types";
 export async function listevents(): Promise<event[]> {
   const { supabase, spaceId } = await requireSpace();
 
-  // Only this space's events.
+  // Only this space's events. Select cover_photo_id too.
   const { data: events, error } = await supabase
     .from("events")
-    .select("id, ordinal, name")
+    .select("id, ordinal, name, cover_photo_id")
     .eq("space_id", spaceId)
     .order("ordinal")
     .order("name");
@@ -44,12 +44,20 @@ export async function listevents(): Promise<event[]> {
     }
   }
 
-  return list.map((l) => ({
-    id: l.id,
-    ordinal: l.ordinal,
-    name: l.name,
-    photos: byevent.get(l.id) ?? [],
-  }));
+  return list.map((l) => {
+    const photos = byevent.get(l.id) ?? [];
+    // cover = the chosen cover photo, else the first photo (default).
+    const cover =
+      photos.find((p) => p.id === l.cover_photo_id) ?? photos[0] ?? null;
+    return {
+      id: l.id,
+      ordinal: l.ordinal,
+      name: l.name,
+      photos,
+      cover_photo_id: l.cover_photo_id ?? null,
+      cover_url: cover?.url ?? null,
+    };
+  });
 }
 
 // Returns the new event's id + ordinal so the caller can keep working with it
@@ -59,9 +67,8 @@ export async function createevent(
 ): Promise<{ id: string; ordinal: number }> {
   const { supabase, spaceId } = await requireSpace();
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("Lajin nimi puuttuu."); // Finnish UI string
+  if (!trimmed) throw new Error("Lajin nimi puuttuu.");
 
-  // Next ordinal = current max within THIS space + 1.
   const { data: max } = await supabase
     .from("events")
     .select("ordinal")
@@ -71,7 +78,6 @@ export async function createevent(
     .maybeSingle();
   const ordinal = (max?.ordinal ?? 0) + 1;
 
-  // space_id is written on insert so the row belongs to this space.
   const { data, error } = await supabase
     .from("events")
     .insert({ space_id: spaceId, name: trimmed, ordinal })
@@ -93,11 +99,25 @@ export async function updateevent(
   if (fields.ordinal !== undefined) patch.ordinal = fields.ordinal;
   if (Object.keys(patch).length === 0) return;
 
-  // Scope by space_id too, not just id — guards against cross-space edits.
   const { error } = await supabase
     .from("events")
     .update(patch)
     .eq("id", id)
+    .eq("space_id", spaceId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/o");
+}
+
+// Set (or clear) which photo is the laji's cover. null = reset to default (first).
+export async function setEventCover(
+  eventId: string,
+  photoId: string | null,
+): Promise<void> {
+  const { supabase, spaceId } = await requireSpace();
+  const { error } = await supabase
+    .from("events")
+    .update({ cover_photo_id: photoId })
+    .eq("id", eventId)
     .eq("space_id", spaceId);
   if (error) throw new Error(error.message);
   revalidatePath("/o");
@@ -121,7 +141,6 @@ export async function reorderevents(orderedIds: string[]): Promise<void> {
 export async function deleteevent(id: string): Promise<void> {
   const { supabase, spaceId } = await requireSpace();
 
-  // Grab photo paths first — DB cascade drops rows, but not Storage files.
   const { data: photos } = await supabase
     .from("event_photos")
     .select("storage_path")
@@ -149,7 +168,6 @@ export async function addeventPhoto(
     throw new Error("Kuva puuttuu.");
   }
 
-  // Stored under {spaceId}/events/... by uploadImage.
   const path = await uploadImage(supabase, spaceId, "events", file);
 
   const { data: max } = await supabase
