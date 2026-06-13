@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BUCKET = "olympialaiset";
-const SIGNED_URL_TTL = 60 * 60; // 1 hour
 
 function extOf(filename: string): string {
   const dot = filename.lastIndexOf(".");
@@ -14,7 +13,7 @@ function extOf(filename: string): string {
 export async function uploadImage(
   supabase: SupabaseClient,
   spaceId: string,
-  folder: "players" | "events" | "space" | "live", // ← widened
+  folder: "players" | "events" | "space" | "live",
   file: File,
 ): Promise<string> {
   const path = `${spaceId}/${folder}/${randomUUID()}.${extOf(file.name)}`;
@@ -38,21 +37,19 @@ export async function deleteImages(
   await supabase.storage.from(BUCKET).remove(clean);
 }
 
-// Sign many paths in a single round-trip → Map of path → signed URL.
+// Build PUBLIC URLs for many paths → Map of path → url.
+// The bucket is public, so this is a pure string build with NO network
+// round-trip — this is the speedup vs. the old createSignedUrls call.
+// Kept async so existing `await signPaths(...)` callers don't need changes.
 export async function signPaths(
   supabase: SupabaseClient,
   paths: (string | null | undefined)[],
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const unique = [...new Set(paths.filter((p): p is string => !!p))];
-  if (unique.length === 0) return map;
-
-  const { data } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrls(unique, SIGNED_URL_TTL);
-
-  for (const item of data ?? []) {
-    if (item.path && item.signedUrl) map.set(item.path, item.signedUrl);
+  for (const path of unique) {
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    if (data?.publicUrl) map.set(path, data.publicUrl);
   }
   return map;
 }
