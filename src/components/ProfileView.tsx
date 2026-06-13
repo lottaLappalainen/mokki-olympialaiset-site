@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, LogOut, Copy, Check } from "lucide-react";
+import { Plus, LogOut } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import PlayerAvatar from "@/components/PlayerAvatar";
 import PlayerForm from "@/components/PlayerForm";
 import { createPlayer } from "@/lib/db/players";
@@ -11,59 +12,30 @@ import { leaveSpace } from "@/lib/auth/actions";
 import type { Player } from "@/lib/db/types";
 
 interface ProfileViewProps {
-  code: string;
   players: Player[];
 }
 
-export default function ProfileView({ code, players }: ProfileViewProps) {
+export default function ProfileView({ players }: ProfileViewProps) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function copyCode() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* code is visible to copy by hand */
-    }
-  }
 
   return (
     <>
-          {/* Code banner: animated wine→plum→teal gradient */}
-          <div
-            className="rounded-2xl p-5 mb-6 text-center text-paper
-                      bg-gradient-to-r from-wine via-plum to-teal-600
-                      bg-[length:200%_200%] animate-[gradientShift_6s_ease-in-out_infinite]"
+      <PageHeader
+        title="Pelaajat"
+        right={
+          <button
+            className="btn btn-primary px-3 py-1.5 text-sm"
+            onClick={() => setAdding(true)}
           >
-            <p className="text-sm font-semibold mb-2 opacity-90">Olympialaisten koodi</p>
-            <button
-              onClick={copyCode}
-              className="block w-full font-mono font-bold tracking-[0.15em] text-4xl break-all"
-            >
-              {code}
-            </button>
-            <p className="text-sm mt-3 opacity-90">
-              {copied ? "Kopioitu!" : "Napauta kopioidaksesi"}
-            </p>
-          </div>
-
-      {/* Players */}
-      <div className="flex items-center justify-between mb-7">
-        <h2 className="font-bold text-ink">Pelaajat</h2>
-        <button
-          className="btn btn-primary px-3 py-1.5 text-sm"
-          onClick={() => setAdding(true)}
-        >
-          <Plus size={16} />
-          Lisää
-        </button>
-      </div>
+            <Plus size={16} />
+            Lisää
+          </button>
+        }
+      />
 
       {players.length === 0 ? (
-        <p className="text-plum-600 mb-6">Ei vielä pelaajia.</p>
+        <p className="text-ink mb-6">Ei vielä pelaajia.</p>
       ) : (
         <div className="grid grid-cols-3 gap-3 mb-6">
           {players.map((p) => (
@@ -72,7 +44,12 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
               href={`/o/pelaajat/${p.id}`}
               className="flex flex-col items-center gap-2"
             >
-              <PlayerAvatar name={p.name} photoUrl={p.photo_url} size={72} />
+              <PlayerAvatar
+                name={p.name}
+                photoUrl={p.photo_url}
+                seed={p.id}
+                size={72}
+              />
               <span className="text-sm font-medium text-ink text-center truncate w-full">
                 {p.name}
               </span>
@@ -81,7 +58,7 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
         </div>
       )}
 
-      {/* Logout */}
+      {/* Logout stays here on Pelaajat */}
       <form action={leaveSpace} className="mt-4">
         <button type="submit" className="btn btn-outline w-full">
           <LogOut size={18} />
@@ -96,7 +73,10 @@ export default function ProfileView({ code, players }: ProfileViewProps) {
           style={{ background: "rgba(16, 33, 30, 0.45)" }}
           onClick={() => setAdding(false)}
         >
-          <div className="card w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="card w-full max-w-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-lg font-bold text-ink mb-4">Lisää pelaaja</h2>
             <PlayerForm
               submitLabel="Lisää pelaaja"

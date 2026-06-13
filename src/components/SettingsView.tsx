@@ -3,15 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronUp } from "lucide-react";
-import PhotoGallery from "@/components/PhotoGallery";
-import PhotoUploader from "@/components/PhotoUploader";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   createPointOption,
   updatePointOption,
   deletePointOption,
-  addSpacePhoto,
-  deleteSpacePhoto,
   updateSpaceHeader,
   type PointOption,
   type SpacePhoto,
@@ -30,13 +26,6 @@ interface SettingsViewProps {
   header: string;
 }
 
-type GalleryPhoto = {
-  id: string;
-  storage_path: string;
-  sort_order: number;
-  url: string | null;
-};
-
 export default function SettingsView({
   options,
   photos,
@@ -52,8 +41,6 @@ export default function SettingsView({
   const [editId, setEditId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editLabel, setEditLabel] = useState("");
-  const [newPhotos, setNewPhotos] = useState<File[]>([]);
-  const [photoResetKey, setPhotoResetKey] = useState(0);
   const [pointsOpen, setPointsOpen] = useState(false);
 
   function confirmRun() {
@@ -94,47 +81,6 @@ export default function SettingsView({
         >
           Tallenna otsikko
         </button>
-      </section>
-
-      {/* ── Olympics-wide photos ──────────────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <h2 className="font-bold text-ink">Olympialaisten kuvat</h2>
-        <PhotoGallery
-          photos={photos as GalleryPhoto[]}
-          onRequestDelete={(photoId) =>
-            setPending({
-              title: "Poista kuva?",
-              destructive: true,
-              run: () => deleteSpacePhoto(photoId),
-            })
-          }
-        />
-        <PhotoUploader
-          multiple
-          label="Lisää kuvia"
-          onFilesChange={setNewPhotos}
-          resetKey={photoResetKey}
-        />
-        {newPhotos.length > 0 && (
-          <button
-            className="btn btn-primary"
-            disabled={busy}
-            onClick={() =>
-              startTransition(async () => {
-                for (const file of newPhotos) {
-                  const fd = new FormData();
-                  fd.append("photo", file);
-                  await addSpacePhoto(fd);
-                }
-                setNewPhotos([]);
-                setPhotoResetKey((k) => k + 1);
-                router.refresh();
-              })
-            }
-          >
-            {busy ? "Tallennetaan…" : `Tallenna ${newPhotos.length} kuvaa`}
-          </button>
-        )}
       </section>
 
       {/* ── Point options ─────────────────────────────────────────────────── */}

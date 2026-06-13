@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { ChevronRight, Images } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { listevents } from "@/lib/db/events";
 import { listEndedLiveEvents } from "@/lib/db/liveEvents";
 import { colorFromSeed } from "@/lib/avatarColor";
 
-export default async function historyPage() {
-  // Scored events first, then ended live events.
+export default async function LajitPage() {
   const [events, endedLive] = await Promise.all([
     listevents(),
     listEndedLiveEvents(),
@@ -16,22 +15,20 @@ export default async function historyPage() {
 
   return (
     <>
+      {/* "Uusi laji" lives in the header's right slot now (gallery icon gone) */}
       <PageHeader
-        title="Historia"
+        title="Lajit"
         right={
-          <Link
-            href="/o/historia/galleria"
-            aria-label="Galleria"
-            className="btn btn-soft px-3"
-          >
-            <Images size={18} />
+          <Link href="/o/kirjaalaji" className="btn btn-primary px-3">
+            <Plus size={18} />
+            Uusi laji
           </Link>
         }
       />
 
       {isEmpty ? (
         <div className="card text-center text-ink">
-          Ei vielä lajeja. Luo ensimmäinen Kirjaa laji -välilehdeltä.
+          Ei vielä lajeja. Luo ensimmäinen Uusi laji -painikkeella.
         </div>
       ) : (
         <div className="flex flex-col gap-2">

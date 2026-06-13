@@ -2,29 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, ClipboardList, Trophy, History, User } from "lucide-react";
+import { Trophy, ListChecks, Images, User, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
-  href: string; // MUST equal a real folder under src/app/o
+  href: string;
   label: string;
   icon: LucideIcon;
 }
 
-// Left side, reading order: settings → log event.
+// Left pair: Lajit, Galleria.
 const left: NavItem[] = [
-  { href: "/o/asetukset", label: "Asetukset", icon: Settings },
-  { href: "/o/kirjaalaji", label: "Lisää laji", icon: ClipboardList },
+  { href: "/o/historia", label: "Lajit", icon: ListChecks },
+  { href: "/o/historia/galleria", label: "Galleria", icon: Images },
 ];
 
-// Right side.
+// Right pair: Pelaajat, Asetukset.
 const right: NavItem[] = [
-  { href: "/o/historia", label: "Historia", icon: History },
   { href: "/o/pelaajat", label: "Pelaajat", icon: User },
+  { href: "/o/asetukset", label: "Asetukset", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/o") return pathname === "/o";
+  // Galleria is nested under /o/historia, so match it exactly and make sure
+  // "Lajit" (/o/historia) doesn't also light up when on the gallery page.
+  if (href === "/o/historia") {
+    return (
+      pathname === "/o/historia" ||
+      (pathname.startsWith("/o/historia/") &&
+        !pathname.startsWith("/o/historia/galleria"))
+    );
+  }
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -34,7 +43,6 @@ function NavButton({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={`flex flex-col items-center gap-1 px-2 py-1 ${
-        // inactive is ink (black), not the blue teal-600
         active ? "text-wine" : "text-ink"
       }`}
     >
@@ -54,14 +62,18 @@ export default function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="relative max-w-md mx-auto flex items-center justify-between px-3 h-16">
-        {/* Left pair */}
+        {/* Left pair: Lajit, Galleria */}
         <div className="flex gap-1">
           {left.map((item) => (
-            <NavButton key={item.href} item={item} active={isActive(pathname, item.href)} />
+            <NavButton
+              key={item.href}
+              item={item}
+              active={isActive(pathname, item.href)}
+            />
           ))}
         </div>
 
-        {/* Center: leaderboard (home), raised */}
+        {/* Center: Tulostaulukko (leaderboard / home), raised */}
         <Link
           href="/o"
           aria-label="Tulostaulukko"
@@ -72,10 +84,14 @@ export default function BottomNav() {
           <Trophy size={24} />
         </Link>
 
-        {/* Right pair */}
+        {/* Right pair: Pelaajat, Asetukset */}
         <div className="flex gap-1">
           {right.map((item) => (
-            <NavButton key={item.href} item={item} active={isActive(pathname, item.href)} />
+            <NavButton
+              key={item.href}
+              item={item}
+              active={isActive(pathname, item.href)}
+            />
           ))}
         </div>
       </div>

@@ -1,19 +1,17 @@
 import PageHeader from "@/components/PageHeader";
 import GalleryGrid from "@/components/GalleryGrid";
+import GalleryAddPhoto from "@/components/GalleryAddPhoto";
 import { listevents } from "@/lib/db/events";
 import { listSpacePhotos } from "@/lib/db/settings";
 import { getLeaderboard } from "@/lib/db/reads";
 
 export default async function GalleriaPage() {
-  // Gather every photo: each laji's photos, the olympics photos, and the
-  // players' profile pics.
   const [events, spacePhotos, rows] = await Promise.all([
     listevents(),
     listSpacePhotos(),
     getLeaderboard(),
   ]);
 
-  // Flatten to a single { url, name } list for the grid + lightbox.
   const photos = [
     ...events.flatMap((e) =>
       e.photos.map((p, i) => ({
@@ -27,13 +25,15 @@ export default async function GalleriaPage() {
     })),
     ...rows.map((r) => ({
       url: r.photo_url,
-      name: `${r.name}.jpg`, // download filename = player's name
+      name: `${r.name}.jpg`,
     })),
-  ].filter((p) => p.url); // drop any without a signed url (incl. photo-less players)
+  ].filter((p) => p.url);
 
   return (
     <>
       <PageHeader title="Galleria" />
+      {/* Add photos to the gallery (saved as space photos) */}
+      <GalleryAddPhoto />
       {photos.length === 0 ? (
         <div className="card text-center text-ink">Ei vielä kuvia.</div>
       ) : (

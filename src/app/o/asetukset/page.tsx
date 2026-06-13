@@ -1,20 +1,21 @@
+import { redirect } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import SettingsView from "@/components/SettingsView";
-import { listPointOptions, listSpacePhotos, getSpaceHeader } from "@/lib/db/settings";
+import { listPointOptions, getSpaceHeader } from "@/lib/db/settings";
+import { getSpaceInfo } from "@/lib/db/reads";
 
 export default async function AsetuksetPage() {
-  const [options, photos, header] = await Promise.all([
+  const [space, options, header] = await Promise.all([
+    getSpaceInfo(),
     listPointOptions(),
-    listSpacePhotos(),
     getSpaceHeader(),
   ]);
+  if (!space) redirect("/");
 
   return (
     <>
-      {/* No subtitle prop — removed per the design rule. */}
       <PageHeader title="Asetukset" />
-      <SettingsView options={options} photos={photos} header={header} />
-
+      <SettingsView code={space.code} options={options} header={header} />
     </>
   );
 }
