@@ -10,30 +10,34 @@ interface PhotoGalleryProps {
   onRequestDelete?: (photoId: string) => void;
 }
 
+// "13.6. klo 14.15"
+function formatStamp(iso: string | null | undefined): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getDate()}.${d.getMonth() + 1}. klo ${hh}.${mm}`;
+}
+
 export default function PhotoGallery({
   photos,
   onRequestDelete,
 }: PhotoGalleryProps) {
-  // null = closed; a number = open at that photo index.
   const [openAt, setOpenAt] = useState<number | null>(null);
   if (photos.length === 0) return null;
 
   return (
     <>
-      {/* Horizontal scroll strip. overflow-x-auto + shrink-0 thumbs = rolling row. */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
         {photos.map((p, i) => (
-          <div
-            key={p.id}
-            className="relative w-28 h-28 shrink-0 snap-start"
-          >
+          <div key={p.id} className="relative w-28 h-28 shrink-0 snap-start">
             {p.url ? (
               <img
                 src={p.url}
                 alt=""
-                loading="lazy"      // only loads as it scrolls into view
+                loading="lazy"
                 decoding="async"
-                onClick={() => setOpenAt(i)} // open lightbox at this photo
+                onClick={() => setOpenAt(i)}
                 className="w-full h-full rounded-xl object-cover bg-surface cursor-pointer"
               />
             ) : (
@@ -53,10 +57,14 @@ export default function PhotoGallery({
         ))}
       </div>
 
-      {/* Shared lightbox with arrows + download */}
       {openAt !== null && (
         <PhotoLightbox
-          photos={photos.map((p, i) => ({ url: p.url, name: `kuva-${i + 1}.jpg` }))}
+          photos={photos.map((p, i) => ({
+            url: p.url,
+            name: `kuva-${i + 1}.jpg`,
+            // shows in the lightbox if eventPhoto carries created_at
+            caption: formatStamp((p as any).created_at),
+          }))}
           startIndex={openAt}
           onClose={() => setOpenAt(null)}
         />

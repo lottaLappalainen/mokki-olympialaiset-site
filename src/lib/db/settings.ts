@@ -17,11 +17,11 @@ export interface SpacePhoto {
   storage_path: string;
   sort_order: number;
   url: string | null;
+  created_at: string | null; // upload timestamp (ISO)
 }
 
 // ── Point options ────────────────────────────────────────────────────────────
 
-// List this space's point options, ordered for the dropdown.
 export async function listPointOptions(): Promise<PointOption[]> {
   const { supabase, spaceId } = await requireSpace();
   const { data, error } = await supabase
@@ -36,7 +36,6 @@ export async function listPointOptions(): Promise<PointOption[]> {
 
 // ── Olympics header (stored in spaces.name) ───────────────────────────────────
 
-// Read the current header text for this space.
 export async function getSpaceHeader(): Promise<string> {
   const { supabase, spaceId } = await requireSpace();
   const { data } = await supabase
@@ -47,7 +46,6 @@ export async function getSpaceHeader(): Promise<string> {
   return data?.name ?? "";
 }
 
-// Save the header text. Empty string clears it (stored as null).
 export async function updateSpaceHeader(name: string): Promise<void> {
   const { supabase, spaceId } = await requireSpace();
   const { error } = await supabase
@@ -55,17 +53,15 @@ export async function updateSpaceHeader(name: string): Promise<void> {
     .update({ name: name.trim() ? name.trim() : null })
     .eq("id", spaceId);
   if (error) throw new Error(error.message);
-  revalidatePath("/o"); // main page + settings re-read it
+  revalidatePath("/o");
 }
 
-// Add a new option. label is optional ("" → stored as null).
 export async function createPointOption(
   value: number,
   label?: string,
 ): Promise<void> {
   const { supabase, spaceId } = await requireSpace();
 
-  // Next sort_order = current max within this space + 1.
   const { data: max } = await supabase
     .from("point_options")
     .select("sort_order")
@@ -82,10 +78,9 @@ export async function createPointOption(
     sort_order,
   });
   if (error) throw new Error(error.message);
-  revalidatePath("/o"); // refresh anything reading the options
+  revalidatePath("/o");
 }
 
-// Edit an existing option (value and/or label).
 export async function updatePointOption(
   id: string,
   fields: { value?: number; label?: string },
@@ -102,7 +97,7 @@ export async function updatePointOption(
     .from("point_options")
     .update(patch)
     .eq("id", id)
-    .eq("space_id", spaceId); // scope guard
+    .eq("space_id", spaceId);
   if (error) throw new Error(error.message);
   revalidatePath("/o");
 }
@@ -124,7 +119,7 @@ export async function listSpacePhotos(): Promise<SpacePhoto[]> {
   const { supabase, spaceId } = await requireSpace();
   const { data } = await supabase
     .from("space_photos")
-    .select("id, storage_path, sort_order")
+    .select("id, storage_path, sort_order, created_at")
     .eq("space_id", spaceId)
     .order("sort_order");
 
@@ -135,10 +130,10 @@ export async function listSpacePhotos(): Promise<SpacePhoto[]> {
     storage_path: p.storage_path,
     sort_order: p.sort_order,
     url: urls.get(p.storage_path) ?? null,
+    created_at: p.created_at ?? null,
   }));
 }
 
-// Expects FormData with a "photo" File. Stored under {spaceId}/space/...
 export async function addSpacePhoto(formData: FormData): Promise<void> {
   const { supabase, spaceId } = await requireSpace();
   const file = formData.get("photo");

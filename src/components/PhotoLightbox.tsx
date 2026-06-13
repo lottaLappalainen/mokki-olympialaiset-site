@@ -6,7 +6,8 @@ import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 export interface LightboxPhoto {
   url: string | null;
-  name?: string; // used for the download filename
+  name?: string;     // used for the download filename
+  caption?: string;  // optional overlay text, e.g. "13.6. klo 14.15"
 }
 
 interface PhotoLightboxProps {
@@ -23,7 +24,6 @@ export default function PhotoLightbox({
   const [index, setIndex] = useState(startIndex);
   const many = photos.length > 1;
 
-  // Wrap around at both ends.
   const prev = useCallback(
     () => setIndex((i) => (i - 1 + photos.length) % photos.length),
     [photos.length],
@@ -33,7 +33,6 @@ export default function PhotoLightbox({
     [photos.length],
   );
 
-  // Keyboard: Esc closes, arrows navigate.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -47,7 +46,6 @@ export default function PhotoLightbox({
   const current = photos[index];
   if (!current?.url) return null;
 
-  // Download by fetching the (signed) URL into a blob, then a temp <a>.
   async function download() {
     try {
       const res = await fetch(current.url!);
@@ -59,7 +57,6 @@ export default function PhotoLightbox({
       a.click();
       URL.revokeObjectURL(href);
     } catch {
-      // If the fetch fails (e.g. expired URL), open it in a new tab instead.
       window.open(current.url!, "_blank");
     }
   }
@@ -68,11 +65,11 @@ export default function PhotoLightbox({
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: "rgba(16, 33, 30, 0.85)" }}
-      onClick={onClose} // backdrop click closes
+      onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
-      {/* Top bar: download + close (stopPropagation so they don't close) */}
+      {/* Top bar: download + close */}
       <div
         className="absolute top-4 right-4 flex gap-2"
         onClick={(e) => e.stopPropagation()}
@@ -93,7 +90,6 @@ export default function PhotoLightbox({
         </button>
       </div>
 
-      {/* Prev arrow (only when there's more than one) */}
       {many && (
         <button
           onClick={(e) => {
@@ -107,16 +103,33 @@ export default function PhotoLightbox({
         </button>
       )}
 
-      {/* The image itself — clicking it should NOT close the modal */}
-      <img
-        src={current.url}
-        alt=""
-        decoding="async"
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] max-w-full rounded-xl object-contain"
-      />
+      {/* Image wrapper — relative so the caption can sit over the photo */}
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={current.url}
+          alt=""
+          decoding="async"
+          className="max-h-[85vh] max-w-full rounded-xl object-contain"
+        />
 
-      {/* Next arrow */}
+        {/* Timestamp overlay — semi-transparent black pill, white text,
+            sitting in the lower part of the photo (not flush at the bottom).
+            Nudged up a little more when a counter is showing. */}
+        {current.caption && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{ bottom: many ? "18%" : "12%" }}
+          >
+            <span
+              className="text-paper text-sm font-medium px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(16, 33, 30, 0.6)" }}
+            >
+              {current.caption}
+            </span>
+          </div>
+        )}
+      </div>
+
       {many && (
         <button
           onClick={(e) => {
@@ -130,7 +143,6 @@ export default function PhotoLightbox({
         </button>
       )}
 
-      {/* Counter, e.g. "2 / 5" */}
       {many && (
         <span className="absolute bottom-5 text-paper text-sm font-medium">
           {index + 1} / {photos.length}
